@@ -314,7 +314,8 @@ async def login(request: Request, body: LoginRequest):
         httponly=True,
         secure=_secure,
         samesite="lax",
-        max_age=86400 * 7
+        max_age=86400 * 7,
+        path="/",
     )
     return response
 
@@ -327,6 +328,7 @@ async def logout():
         httponly=True,
         secure=_secure,
         samesite="lax",
+        path="/",
     )
     return response
 

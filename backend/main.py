@@ -64,7 +64,11 @@ from worker import run_worker_loop, process_queued_items
 
 # ── Security & Auth ───────────────────────────────────────────────────────
 def verify_password(plain_password, hashed_password):
-    return _bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
+    try:
+        return _bcrypt.checkpw(plain_password.encode(), hashed_password.strip().encode())
+    except Exception as exc:
+        log.error("bcrypt.checkpw raised: %s", exc)
+        return False
 
 _LOGIN_FAILURES: dict[str, list[float]] = defaultdict(list)
 _LOCKOUT_MAX = 5
@@ -282,8 +286,13 @@ async def login(request: Request, body: LoginRequest):
         return JSONResponse({"detail": "Too many failed attempts. Try again later."}, status_code=429)
 
     user = await db.get_admin_user(email)
-    if not user or not verify_password(body.password, user["password_hash"]):
+    if not user:
         _record_failure(email)
+        log.warning("login failed: user not found for email=%s", email)
+        return JSONResponse({"detail": "Invalid credentials"}, status_code=401)
+    if not verify_password(body.password, user["password_hash"]):
+        _record_failure(email)
+        log.warning("login failed: wrong password for email=%s hash_prefix=%s", email, user["password_hash"][:10])
         return JSONResponse({"detail": "Invalid credentials"}, status_code=401)
 
     _clear_failures(email)

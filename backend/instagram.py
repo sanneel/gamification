@@ -65,6 +65,9 @@ def _publishable_image_url(image_url: str, settings: dict) -> str:
     base = _public_base_url(settings)
     if not base:
         return image_url
+    # Already hosted on our server — serve directly, no extra proxy layer
+    if image_url.startswith(base + "/"):
+        return image_url
     return f"{base}/api/image?url={quote(image_url, safe='')}"
 
 
@@ -216,7 +219,7 @@ async def post_product(product: dict, settings: dict) -> PostResult:
 
     caption_text = (product.get("caption") or "").strip()
     hashtags     = product.get("hashtags") or []
-    hashtag_str  = " ".join(f"#{t}" for t in hashtags if t)
+    hashtag_str  = " ".join(f"#{t.lstrip('#')}" for t in hashtags if t)
     full_caption = f"{caption_text}\n\n{hashtag_str}".strip()
 
     # Build publishable image URLs (max carousel limit)

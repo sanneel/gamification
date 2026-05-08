@@ -45,13 +45,15 @@ let catalogProducts = [], catalogTotal = 0, catalogStage = 'REVIEWED', catalogSe
 
 // ── Nav ────────────────────────────────────────────────────────────────────
 const NAV_PAGES = [
-  { id:'tools',     label:'Tools',        icon:'queue'    },
+  { id:'pipeline',  label:'Pipeline',     icon:'queue'    },
   { id:'analytics', label:'Analytics',    icon:'analytics'},
   { id:'settings',  label:'Settings',     icon:'settings' },
-  { id:'chat',      label:'AI Assistant', icon:'chat'     },
+  { id:'chat',      label:'AI',           icon:'chat'     },
 ];
 
-const TOOLS_PAGES = new Set(['tools','dashboard','queue','textEdit','REVIEWED','LIVE','REJECTED','catalog','pipeline']);
+const TOOLS_PAGES = new Set(['tools','pipeline','dashboard','queue','textEdit','REVIEWED','LIVE','REJECTED','catalog']);
+
+const PIPELINE_STAGE_PAGES = new Set(['queue','textEdit','REVIEWED','LIVE','REJECTED','catalog']);
 
 function resetSelectionState() {
   selectedProducts.clear();
@@ -86,6 +88,7 @@ function buildNav() {
 }
 
 function navigate(page) {
+  if (page === 'pipeline') page = 'queue';
   currentPage = page;
   resetSelectionState();
   resetCatalogState();
@@ -2340,7 +2343,6 @@ function renderMarginsTab() {
 }
 
 const PAGE_RENDERERS = {
-  tools:     renderTools,
   dashboard: renderDashboard,
   pipeline:  renderPipeline,
   queue:     renderQueue,
@@ -2646,6 +2648,23 @@ function debCatalogSearch(val) {
 
 
 
+function _pipelineSubNav(active) {
+  const stages = [
+    { id: 'queue',    label: 'Review',    count: stats.SCRAPED   },
+    { id: 'textEdit', label: 'Text Edit', count: stats.ENRICHED  },
+    { id: 'REVIEWED', label: 'Approved',  count: stats.REVIEWED  },
+    { id: 'LIVE',     label: 'Posted',    count: stats.LIVE      },
+    { id: 'catalog',  label: 'Catalog',   count: null            },
+    { id: 'REJECTED', label: 'Rejected',  count: stats.REJECTED  },
+  ];
+  const tabs = stages.map(s => {
+    const badge = s.count != null && s.count > 0
+      ? `<span style="margin-left:5px;font-family:var(--ff-m);font-size:10px;opacity:.7">${s.count}</span>` : '';
+    return `<button class="cat-tab ${s.id === active ? 'active' : ''}" onclick="navigate('${s.id}')">${s.label}${badge}</button>`;
+  }).join('');
+  return `<div class="catalog-tabs" style="margin-bottom:20px">${tabs}</div>`;
+}
+
 async function renderPage() {
   if (currentPage !== 'login') _fadeIn();
   const fn = PAGE_RENDERERS[currentPage];
@@ -2654,6 +2673,14 @@ async function renderPage() {
     if (c) c.innerHTML =
       `<div style="color:var(--red);padding:20px;font-family:var(--ff-m);font-size:12px">Error: ${escHtml(e.message)}</div>`;
   });
+  if (PIPELINE_STAGE_PAGES.has(currentPage)) {
+    const el = document.getElementById('content');
+    if (el) {
+      const nav = document.createElement('div');
+      nav.innerHTML = _pipelineSubNav(currentPage);
+      el.insertBefore(nav.firstElementChild, el.firstChild);
+    }
+  }
 }
 
 

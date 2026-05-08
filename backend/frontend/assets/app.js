@@ -2097,8 +2097,7 @@ async function handleLogin(e) {
     const email = document.getElementById('login-email').value;
     const password = document.getElementById('login-password').value;
     await api('/auth/login', 'POST', { email, password });
-    document.body.classList.remove('is-login');
-    window.location.href = '/';
+    await bootApp();
   } catch(err) {
     btn.textContent = 'Sign In';
     btn.disabled = false;
@@ -2877,23 +2876,23 @@ function chooseStartPage() {
 }
 
 // ── Boot: check auth first, then load app ─────────────────────────────────
-(async () => {
+async function bootApp() {
   try {
-    // Single auth-check request. If this 401s, the api() interceptor shows login and sets _isLoggedOut.
     stats = await api('/stats');
   } catch(e) {
-    // Not authenticated — login page is already shown, stop here.
+    // Not authenticated — login page is already shown by the api() interceptor.
     return;
   }
-  // Authenticated — boot the full app
   _isLoggedOut = false;
+  document.body.classList.remove('is-login');
   currentPage = chooseStartPage();
   buildNav();
   renderPage();
-  // Load non-critical settings silently after boot
   api('/settings').then(s => { scanSource = String(s.cssbuy_source || '1688'); }).catch(() => {});
   setInterval(() => { if (currentPage !== 'login') refreshStats(); }, 20000);
-})();
+}
+
+bootApp();
 
 
 

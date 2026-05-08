@@ -50,10 +50,10 @@ const NAV_PAGES = [
   { id:'pipeline',  label:'Pipeline',     icon:'scan',      section:undefined  },
   { id:'queue',     label:'Review',       icon:'queue',     section:'Pipeline', stageKey:'SCRAPED'  },
   { id:'textEdit',  label:'Text edit',    icon:'settings',  stageKey:'ENRICHED' },
-  { id:'REVIEWED',  label:'Approved',     icon:'REVIEWED',  stageKey:'REVIEWED' },
-  { id:'LIVE',    label:'Posted',       icon:'LIVE'     },
+  { id:'REVIEWED',  label:'Approved',     icon:'approved',  stageKey:'REVIEWED' },
+  { id:'LIVE',    label:'Posted',       icon:'posted'     },
   { id:'catalog',   label:'Catalog',      icon:'catalog',   section:'Catalog'   },
-  { id:'REJECTED',  label:'Rejected',     icon:'REJECTED'   },
+  { id:'REJECTED',  label:'Rejected',     icon:'rejected'   },
   { id:'settings',  label:'Settings',     icon:'settings',  section:'Config'    },
   { id:'analytics', label:'Analytics',   icon:'analytics', section:'Tools'    },
   { id:'chat',      label:'AI Assistant',icon:'chat'                           },
@@ -88,7 +88,7 @@ function buildNav() {
     const badgeClass = p.stageKey === 'REVIEWED' ? 'nav-badge g' : 'nav-badge';
     html += `
       <button class="nav-item${p.id === currentPage ? ' active' : ''}" onclick="navigate('${p.id}')" title="${p.label}">
-        ${IC[p.icon]}
+        ${IC[p.icon] || ''}
         <span class="lbl">${p.label}</span>
         ${cnt != null && cnt > 0 ? `<span class="${badgeClass}">${cnt}</span>` : ''}
       </button>`;

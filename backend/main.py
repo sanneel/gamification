@@ -279,7 +279,6 @@ class LoginRequest(BaseModel):
     password: str
 
 @app.post("/api/auth/login")
-@limiter.limit("5/minute")
 async def login(request: Request, body: LoginRequest):
     email = body.email.strip().lower()
     if _is_locked_out(email):

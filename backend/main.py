@@ -231,7 +231,7 @@ async def security_headers_middleware(request: Request, call_next):
     supabase_domain = urlparse(supabase_url).netloc if supabase_url else ""
     csp_img = f"img-src 'self' data: blob: https://{supabase_domain};" if supabase_domain else "img-src 'self' data: blob:;"
     
-    response.headers["Content-Security-Policy"] = f"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; {csp_img} connect-src 'self' https://{supabase_domain};"
+    response.headers["Content-Security-Policy"] = f"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; {csp_img} connect-src 'self' https://{supabase_domain};"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     response.headers["Server"] = "webserver"
     response.headers["X-Content-Type-Options"] = "nosniff"

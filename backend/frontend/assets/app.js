@@ -2104,21 +2104,22 @@ function _loginError(msg) {
 
 async function handleLogin(ev) {
   ev.preventDefault();
-  const btn = document.getElementById('login-btn');
-  document.getElementById('login-error').style.display = 'none';
-  btn.textContent = 'Signing in...';
-  btn.disabled = true;
   try {
-    const email = document.getElementById('login-email').value.trim();
-    const password = document.getElementById('login-password').value;
+    const btn = document.getElementById('login-btn');
+    const errEl = document.getElementById('login-error');
+    if (errEl) errEl.style.display = 'none';
+    if (btn) { btn.textContent = 'Signing in...'; btn.disabled = true; }
+    const email = (document.getElementById('login-email') || {}).value?.trim() || '';
+    const password = (document.getElementById('login-password') || {}).value || '';
+    if (!email || !password) { _loginError('Please enter your email and password.'); return; }
     const data = await api('/auth/login', 'POST', { email, password });
-    if (!data.token) {
-      _loginError('Server error: no token returned. Check Railway logs.');
+    if (!data || !data.token) {
+      _loginError('Server error: no token returned.');
       return;
     }
     setToken(data.token);
     const ok = await bootApp();
-    if (!ok) _loginError('Authenticated but session failed to start. Please try again.');
+    if (!ok) _loginError('Authenticated but session failed to load. Please try again.');
   } catch(err) {
     const msg = err.message === 'Unauthorized'
       ? 'Invalid email or password.'
@@ -2135,15 +2136,7 @@ function _fadeIn() {
   requestAnimationFrame(() => { c.style.opacity = '1'; });
 }
 
-function renderPage() {
-  const fn = PAGE_RENDERERS[currentPage];
-  if (fn) {
-    if (currentPage !== 'login') _fadeIn();
-    fn();
-  } else {
-    console.warn('No renderer for page:', currentPage);
-  }
-}
+
 
 // ── Catalog ───────────────────────────────────────────────────────────────
 
@@ -2368,10 +2361,12 @@ function debCatalogSearch(val) {
 
 
 async function renderPage() {
+  if (currentPage !== 'login') _fadeIn();
   const fn = PAGE_RENDERERS[currentPage];
   if (fn) await fn().catch(e => {
-    document.getElementById('content').innerHTML =
-      `<div style="color:var(--red);padding:20px;font-family:var(--ff-m);font-size:12px">Error: ${e.message}</div>`;
+    const c = document.getElementById('content');
+    if (c) c.innerHTML =
+      `<div style="color:var(--red);padding:20px;font-family:var(--ff-m);font-size:12px">Error: ${escHtml(e.message)}</div>`;
   });
 }
 

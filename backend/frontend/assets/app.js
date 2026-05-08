@@ -2078,6 +2078,7 @@ async function renderLogin() {
             <label>Password</label>
             <input type="password" id="login-password" required />
           </div>
+          <div id="login-error" style="display:none;color:var(--red,#e55);font-size:12px;margin-bottom:8px;text-align:center"></div>
           <button type="submit" class="btn login-btn" id="login-btn">Sign In</button>
         </form>
       </div>
@@ -2088,6 +2089,8 @@ async function renderLogin() {
 async function handleLogin(e) {
   e.preventDefault();
   const btn = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
   btn.textContent = 'Signing in...';
   btn.disabled = true;
   try {
@@ -2095,11 +2098,15 @@ async function handleLogin(e) {
     const password = document.getElementById('login-password').value;
     await api('/auth/login', 'POST', { email, password });
     document.body.classList.remove('is-login');
-    // Restore the app layout
     window.location.reload();
   } catch(err) {
     btn.textContent = 'Sign In';
     btn.disabled = false;
+    const msg = err.message === 'Unauthorized'
+      ? 'Invalid email or password.'
+      : (err.message || 'Login failed. Please try again.');
+    errEl.textContent = msg;
+    errEl.style.display = 'block';
   }
 }
 

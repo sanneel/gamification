@@ -258,12 +258,13 @@ async def jwt_auth_middleware(request: Request, call_next):
     if not path.startswith("/api/"):
         return await call_next(request)
 
-    token = request.cookies.get("admin_token")
     secret = os.getenv("JWT_SECRET")
-
     if not secret:
-        # Default to open if no JWT_SECRET is configured
         return await call_next(request)
+
+    # Accept Bearer token from Authorization header
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header[7:] if auth_header.startswith("Bearer ") else None
 
     if not token:
         return JSONResponse({"detail": "Unauthorized"}, status_code=401)
@@ -310,31 +311,11 @@ async def login(request: Request, body: LoginRequest):
         algorithm="HS256"
     )
 
-    _secure = _on_railway
-    response = JSONResponse({"ok": True})
-    response.set_cookie(
-        key="admin_token",
-        value=token,
-        httponly=True,
-        secure=_secure,
-        samesite="lax",
-        max_age=86400 * 7,
-        path="/",
-    )
-    return response
+    return JSONResponse({"ok": True, "token": token})
 
 @app.post("/api/auth/logout")
 async def logout():
-    _secure = _on_railway
-    response = JSONResponse({"ok": True})
-    response.delete_cookie(
-        key="admin_token",
-        httponly=True,
-        secure=_secure,
-        samesite="lax",
-        path="/",
-    )
-    return response
+    return JSONResponse({"ok": True})
 
 # ── Routes & Mounts ────────────────────────────────────────────────────────
 

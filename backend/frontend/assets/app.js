@@ -189,15 +189,24 @@ async function cachedApi(path) {
   return data;
 }
 
-// Set to true when we know we're not authenticated, to suppress all further API toasts
+// ── Auth token (localStorage, no cookies) ─────────────────────────────────
+const TOKEN_KEY = 'dropos_admin_token';
+function getToken() { return localStorage.getItem(TOKEN_KEY); }
+function setToken(t) { localStorage.setItem(TOKEN_KEY, t); }
+function clearToken() { localStorage.removeItem(TOKEN_KEY); }
+
 let _isLoggedOut = false;
 
 async function api(path, method = 'GET', body = null) {
-  const opts = { method, headers: { 'Content-Type': 'application/json' }, credentials: 'include' };
+  const headers = { 'Content-Type': 'application/json' };
+  const token = getToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const opts = { method, headers };
   if (body !== null) opts.body = JSON.stringify(body);
   try {
     const r = await fetch(API + path, opts);
     if (r.status === 401) {
+      clearToken();
       if (path !== '/auth/login' && !_isLoggedOut) {
         _isLoggedOut = true;
         currentPage = 'login';
@@ -211,7 +220,6 @@ async function api(path, method = 'GET', body = null) {
     }
     return r.json();
   } catch(e) {
-    // Never show toast for auth errors — the login screen handles it visually
     if (e.message !== 'Unauthorized' && !_isLoggedOut) toast(e.message || 'API error', 'error');
     throw e;
   }
@@ -2096,11 +2104,10 @@ async function handleLogin(e) {
   try {
     const email = document.getElementById('login-email').value;
     const password = document.getElementById('login-password').value;
-    await api('/auth/login', 'POST', { email, password });
-    // Small delay so all browsers (especially Safari) flush the Set-Cookie to their
-    // persistent store before we navigate away. Without this, mobile Safari drops the cookie.
-    await new Promise(r => setTimeout(r, 300));
-    window.location.replace('/');
+    const data = await api('/auth/login', 'POST', { email, password });
+    setToken(data.token);
+    const ok = await bootApp();
+    if (!ok) throw new Error('Session could not be established. Please try again.');
   } catch(err) {
     btn.textContent = 'Sign In';
     btn.disabled = false;
@@ -2880,11 +2887,18 @@ function chooseStartPage() {
 
 // ── Boot: check auth first, then load app ─────────────────────────────────
 async function bootApp() {
+  if (!getToken()) {
+    // No token stored — show login immediately without a network round-trip
+    currentPage = 'login';
+    renderPage();
+    return false;
+  }
   try {
     stats = await api('/stats');
   } catch(e) {
-    // Not authenticated — login page is already shown by the api() interceptor.
-    return;
+    currentPage = 'login';
+    renderPage();
+    return false;
   }
   _isLoggedOut = false;
   document.body.classList.remove('is-login');
@@ -2893,6 +2907,7 @@ async function bootApp() {
   renderPage();
   api('/settings').then(s => { scanSource = String(s.cssbuy_source || '1688'); }).catch(() => {});
   setInterval(() => { if (currentPage !== 'login') refreshStats(); }, 20000);
+  return true;
 }
 
 bootApp();

@@ -189,7 +189,7 @@ async def lifespan(app: FastAPI):
     await db.close()
 
 # ── App Initialization ─────────────────────────────────────────────────────
-is_dev = os.getenv("RAILWAY_ENVIRONMENT_NAME", "development").lower() in ["development", "local", ""]
+is_dev = os.getenv("RAILWAY_ENVIRONMENT_NAME") is None
 
 app = FastAPI(
     title="DropOS", 
@@ -206,10 +206,15 @@ app.add_middleware(SlowAPIMiddleware)
 _railway_proxy = os.getenv("RAILWAY_PROXY_TRUSTED_HOST", "127.0.0.1")
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=_railway_proxy)
 
-# Restrict CORS to specific domain; localhost only allowed in dev
-_env_name = os.getenv("RAILWAY_ENVIRONMENT_NAME", "production").lower()
+# _on_railway is True whenever deployed to Railway (any env name), False when running locally.
+# Railway ALWAYS serves HTTPS, so cookies must have Secure=True there.
+# Locally we serve HTTP, so Secure=True would break cookie delivery.
+_on_railway = os.getenv("RAILWAY_ENVIRONMENT_NAME") is not None
+_env_name = os.getenv("RAILWAY_ENVIRONMENT_NAME", "local").lower()
+
+# Restrict CORS to specific domain; localhost only allowed locally
 _allowed_origins = [o for o in [os.getenv("FRONTEND_DOMAIN", "")] if o]
-if _env_name in ("development", "local"):
+if not _on_railway:
     _allowed_origins += ["http://localhost:3000", "http://127.0.0.1:8000"]
 app.add_middleware(
     CORSMiddleware,
@@ -305,7 +310,7 @@ async def login(request: Request, body: LoginRequest):
         algorithm="HS256"
     )
 
-    _secure = _env_name not in ("development", "local")
+    _secure = _on_railway
     response = JSONResponse({"ok": True})
     response.set_cookie(
         key="admin_token",
@@ -320,7 +325,7 @@ async def login(request: Request, body: LoginRequest):
 
 @app.post("/api/auth/logout")
 async def logout():
-    _secure = _env_name not in ("development", "local")
+    _secure = _on_railway
     response = JSONResponse({"ok": True})
     response.delete_cookie(
         key="admin_token",

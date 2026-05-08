@@ -2094,28 +2094,36 @@ async function renderLogin() {
   `;
 }
 
-async function handleLogin(e) {
-  e.preventDefault();
+function _loginError(msg) {
+  // Always re-query elements — DOM may have been replaced by bootApp
+  const b = document.getElementById('login-btn');
+  const e = document.getElementById('login-error');
+  if (b) { b.textContent = 'Sign In'; b.disabled = false; }
+  if (e) { e.textContent = msg; e.style.display = 'block'; }
+}
+
+async function handleLogin(ev) {
+  ev.preventDefault();
   const btn = document.getElementById('login-btn');
-  const errEl = document.getElementById('login-error');
-  errEl.style.display = 'none';
+  document.getElementById('login-error').style.display = 'none';
   btn.textContent = 'Signing in...';
   btn.disabled = true;
   try {
-    const email = document.getElementById('login-email').value;
+    const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value;
     const data = await api('/auth/login', 'POST', { email, password });
+    if (!data.token) {
+      _loginError('Server error: no token returned. Check Railway logs.');
+      return;
+    }
     setToken(data.token);
     const ok = await bootApp();
-    if (!ok) throw new Error('Session could not be established. Please try again.');
+    if (!ok) _loginError('Authenticated but session failed to start. Please try again.');
   } catch(err) {
-    btn.textContent = 'Sign In';
-    btn.disabled = false;
     const msg = err.message === 'Unauthorized'
       ? 'Invalid email or password.'
       : (err.message || 'Login failed. Please try again.');
-    errEl.textContent = msg;
-    errEl.style.display = 'block';
+    _loginError(msg);
   }
 }
 
@@ -2885,26 +2893,27 @@ function chooseStartPage() {
   return 'dashboard';
 }
 
-// ── Boot: check auth first, then load app ─────────────────────────────────
+// ── Boot ──────────────────────────────────────────────────────────────────
 async function bootApp() {
-  if (!getToken()) {
-    // No token stored — show login immediately without a network round-trip
+  const token = getToken();
+  if (!token) {
     currentPage = 'login';
-    renderPage();
+    await renderPage();
     return false;
   }
   try {
     stats = await api('/stats');
   } catch(e) {
+    clearToken();
     currentPage = 'login';
-    renderPage();
+    await renderPage();
     return false;
   }
   _isLoggedOut = false;
   document.body.classList.remove('is-login');
   currentPage = chooseStartPage();
   buildNav();
-  renderPage();
+  await renderPage();
   api('/settings').then(s => { scanSource = String(s.cssbuy_source || '1688'); }).catch(() => {});
   setInterval(() => { if (currentPage !== 'login') refreshStats(); }, 20000);
   return true;

@@ -246,7 +246,7 @@ async def jwt_auth_middleware(request: Request, call_next):
         return await call_next(request)
 
     path = request.url.path
-    is_public = path in ["/robots.txt", "/health", "/shop", "/api/catalog", "/api/auth/login"] or \
+    is_public = path in ["/robots.txt", "/health", "/shop", "/api/catalog", "/api/auth/login", "/api/version"] or \
                 path.startswith("/api/image") or \
                 path.startswith("/static") or \
                 "/assets/" in path or path.endswith("/assets")
@@ -330,6 +330,10 @@ async def spa_fallback(request: Request, exc: HTTPException):
         p = os.path.join(PUBLIC_DIR, "index.html")
         if os.path.exists(p): return FileResponse(p)
     return JSONResponse(status_code=404, content={"detail": "Not Found"})
+
+@app.get("/api/version")
+async def version():
+    return {"auth": "bearer", "version": "v10"}
 
 @app.get("/robots.txt", response_class=PlainTextResponse)
 async def robots_txt():

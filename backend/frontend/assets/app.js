@@ -2098,7 +2098,7 @@ async function handleLogin(e) {
     const password = document.getElementById('login-password').value;
     await api('/auth/login', 'POST', { email, password });
     document.body.classList.remove('is-login');
-    window.location.reload();
+    window.location.href = '/';
   } catch(err) {
     btn.textContent = 'Sign In';
     btn.disabled = false;

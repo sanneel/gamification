@@ -77,6 +77,8 @@ function resetPipelineState() {
 }
 
 function buildNav() {
+  const navEl = document.getElementById('nav');
+  if (!navEl) return;
   let html = '';
   let lastSection = null;
   for (const p of NAV_PAGES) {
@@ -93,7 +95,7 @@ function buildNav() {
         ${cnt != null && cnt > 0 ? `<span class="${badgeClass}">${cnt}</span>` : ''}
       </button>`;
   }
-  document.getElementById('nav').innerHTML = html;
+  navEl.innerHTML = html;
 }
 
 function navigate(page) {
@@ -2071,7 +2073,7 @@ const PAGE_RENDERERS = {
 
 async function renderLogin() {
   document.body.classList.add('is-login');
-  const el = document.getElementById('app');
+  const el = document.getElementById('content');
   el.innerHTML = `
     <div class="login-container">
       <div class="login-box">

@@ -6,3 +6,12 @@ __pycache__/
 .env
 node_modules/
 .DS_Store
+
+# Session/cookie exports — contain live credentials, never commit
+backend/cssbuy_session.json
+backend/superbuy_cookies.json
+backend/*_cookies.json
+backend/*_session.json
+
+# Claude local settings — may contain credentials
+.claude/settings.local.json

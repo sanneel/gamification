@@ -2097,7 +2097,10 @@ async function handleLogin(e) {
     const email = document.getElementById('login-email').value;
     const password = document.getElementById('login-password').value;
     await api('/auth/login', 'POST', { email, password });
-    await bootApp();
+    // Small delay so all browsers (especially Safari) flush the Set-Cookie to their
+    // persistent store before we navigate away. Without this, mobile Safari drops the cookie.
+    await new Promise(r => setTimeout(r, 300));
+    window.location.replace('/');
   } catch(err) {
     btn.textContent = 'Sign In';
     btn.disabled = false;

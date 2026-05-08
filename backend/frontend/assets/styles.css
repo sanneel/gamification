@@ -1224,6 +1224,46 @@ body.is-login #content { width: 100%; display: flex; align-items: center; justif
 /* Page fade */
 #content { transition: opacity 0.15s ease; }
 
+/* ── Tool Cards ──────────────────────────────────────────────────────────── */
+.tool-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.tool-card {
+  background: var(--s1);
+  border: 1px solid var(--b1);
+  border-radius: var(--r-lg);
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color .2s var(--ease), background .2s var(--ease);
+}
+.tool-card:hover { border-color: var(--b2); background: rgba(255,255,255,.012); }
+
+.tool-card-title {
+  font-family: var(--ff-d);
+  font-style: italic;
+  font-size: 19px;
+  font-weight: 400;
+  color: var(--t1);
+  line-height: 1;
+}
+
+.tool-card-desc {
+  font-size: 12px;
+  color: var(--t3);
+  line-height: 1.6;
+  flex: 1;
+}
+
+.tool-card-footer {
+  padding-top: 12px;
+  border-top: 1px solid var(--b1);
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
    MOBILE RESPONSIVE (<= 768px)
 ───────────────────────────────────────────────────────────────────────── */
@@ -1293,6 +1333,7 @@ body.is-login #content { width: 100%; display: flex; align-items: center; justif
   .chat-product-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
   .chat-bulk-row { flex-direction: column; }
 
+  .tool-cards-grid { grid-template-columns: 1fr; }
   .catalog-toolbar { flex-direction: column; align-items: flex-start; gap: 8px; }
   .cat-caption-preview { display: none; }
   .settings-grid { grid-template-columns: 1fr !important; }

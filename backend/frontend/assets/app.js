@@ -45,19 +45,13 @@ let catalogProducts = [], catalogTotal = 0, catalogStage = 'REVIEWED', catalogSe
 
 // ── Nav ────────────────────────────────────────────────────────────────────
 const NAV_PAGES = [
-  { id:'dashboard', label:'Today',        icon:'dashboard', section:'Overview' },
-  { id:'scan',      label:'Find',         icon:'scan'                          },
-  { id:'pipeline',  label:'Pipeline',     icon:'scan',      section:undefined  },
-  { id:'queue',     label:'Review',       icon:'queue',     section:'Pipeline', stageKey:'SCRAPED'  },
-  { id:'textEdit',  label:'Text edit',    icon:'settings',  stageKey:'ENRICHED' },
-  { id:'REVIEWED',  label:'Approved',     icon:'approved',  stageKey:'REVIEWED' },
-  { id:'LIVE',    label:'Posted',       icon:'posted'     },
-  { id:'catalog',   label:'Catalog',      icon:'catalog',   section:'Catalog'   },
-  { id:'REJECTED',  label:'Rejected',     icon:'rejected'   },
-  { id:'settings',  label:'Settings',     icon:'settings',  section:'Config'    },
-  { id:'analytics', label:'Analytics',   icon:'analytics', section:'Tools'    },
-  { id:'chat',      label:'AI Assistant',icon:'chat'                           },
+  { id:'tools',     label:'Tools',        icon:'queue'    },
+  { id:'analytics', label:'Analytics',    icon:'analytics'},
+  { id:'settings',  label:'Settings',     icon:'settings' },
+  { id:'chat',      label:'AI Assistant', icon:'chat'     },
 ];
+
+const TOOLS_PAGES = new Set(['tools','dashboard','queue','textEdit','REVIEWED','LIVE','REJECTED','catalog','pipeline']);
 
 function resetSelectionState() {
   selectedProducts.clear();
@@ -80,19 +74,12 @@ function buildNav() {
   const navEl = document.getElementById('nav');
   if (!navEl) return;
   let html = '';
-  let lastSection = null;
   for (const p of NAV_PAGES) {
-    if (p.section && p.section !== lastSection) {
-      html += `<span class="nav-group-label">${escHtml(p.section)}</span>`;
-      lastSection = p.section;
-    }
-    const cnt = p.stageKey ? stats[p.stageKey] : null;
-    const badgeClass = p.stageKey === 'REVIEWED' ? 'nav-badge g' : 'nav-badge';
+    const isActive = p.id === currentPage || (p.id === 'tools' && TOOLS_PAGES.has(currentPage));
     html += `
-      <button class="nav-item${p.id === currentPage ? ' active' : ''}" onclick="navigate('${p.id}')" title="${p.label}">
+      <button class="nav-item${isActive ? ' active' : ''}" onclick="navigate('${p.id}')" title="${p.label}">
         ${IC[p.icon] || ''}
-        <span class="lbl">${p.label}</span>
-        ${cnt != null && cnt > 0 ? `<span class="${badgeClass}">${cnt}</span>` : ''}
+        <span class="lbl">${escHtml(p.label)}</span>
       </button>`;
   }
   navEl.innerHTML = html;
@@ -2055,9 +2042,306 @@ async function clearScanHistory() {
   renderPipeline();
 }
 
+// ── Tools Hub ─────────────────────────────────────────────────────────────────
+
+function toolCard({ title, desc, status, action, actionLabel, badge }) {
+  const statusBadge = status === 'ready'
+    ? '<span class="badge badge-green">Ready</span>'
+    : '<span class="badge badge-gray">Coming Soon</span>';
+  const badgeHtml = badge ? `<span class="badge badge-amber" style="margin-left:6px">${badge} pending</span>` : '';
+  const btnClass = status === 'ready' ? 'btn btn-sm btn-primary' : 'btn btn-sm';
+  const btnAttrs = action ? `onclick="${action}"` : 'disabled';
+  return `
+    <div class="tool-card">
+      <div class="tool-card-header">
+        <div class="tool-card-title">${escHtml(title)}</div>
+        <div style="margin-top:5px">${statusBadge}${badgeHtml}</div>
+      </div>
+      <div class="tool-card-desc">${escHtml(desc)}</div>
+      <div class="tool-card-footer">
+        <button class="${btnClass}" ${btnAttrs}>${escHtml(actionLabel)}</button>
+      </div>
+    </div>`;
+}
+
+async function renderTools() {
+  setTitle('Tools', 'Automation Hub');
+  document.getElementById('topbar-actions').innerHTML = '';
+  const el = document.getElementById('content');
+  const s = stats;
+
+  el.innerHTML = `
+    <div class="stat-row" style="margin-bottom:24px">
+      <div class="stat-card blue" style="cursor:pointer" onclick="navigate('queue')">
+        <div class="stat-label">Review Queue</div>
+        <div class="stat-val">${s.SCRAPED ?? 0}</div>
+        <div class="stat-sub">pending review</div>
+      </div>
+      <div class="stat-card green" style="cursor:pointer" onclick="navigate('REVIEWED')">
+        <div class="stat-label">Approved</div>
+        <div class="stat-val">${s.REVIEWED ?? 0}</div>
+        <div class="stat-sub">ready to post</div>
+      </div>
+      <div class="stat-card amber" style="cursor:pointer" onclick="navigate('LIVE')">
+        <div class="stat-label">Posted</div>
+        <div class="stat-val">${s.LIVE ?? 0}</div>
+        <div class="stat-sub">live on Instagram</div>
+      </div>
+      <div class="stat-card gray" style="cursor:pointer" onclick="navigate('catalog')">
+        <div class="stat-label">Catalog</div>
+        <div class="stat-val">${(s.REVIEWED ?? 0) + (s.LIVE ?? 0)}</div>
+        <div class="stat-sub">total approved</div>
+      </div>
+    </div>
+
+    <div class="tool-cards-grid">
+      ${toolCard({
+        title: 'Post Scheduler',
+        desc: 'View and manage the Instagram posts queue. Review approved products and track posted / queued / failed status.',
+        status: 'ready',
+        action: "navigate('LIVE')",
+        actionLabel: 'Open Scheduler'
+      })}
+      ${toolCard({
+        title: 'Product Review',
+        desc: 'Review scraped products from ingestion, approve or reject, and move them through the pipeline.',
+        status: 'ready',
+        action: "navigate('queue')",
+        actionLabel: 'Review Products',
+        badge: s.SCRAPED > 0 ? s.SCRAPED : null
+      })}
+      ${toolCard({
+        title: 'Image Editor',
+        desc: 'Trigger background removal and collage generation for product images. View cleaned image previews.',
+        status: 'ready',
+        action: "navigate('catalog')",
+        actionLabel: 'Open Catalog'
+      })}
+      ${toolCard({
+        title: 'Enrichment Runner',
+        desc: 'Manually trigger AI enrichment on pending products: titles, descriptions, captions, hashtags.',
+        status: 'ready',
+        action: "navigate('textEdit')",
+        actionLabel: 'Text Edit'
+      })}
+      ${toolCard({
+        title: 'Caption Generator',
+        desc: 'Input a product name or URL and generate Instagram captions in 3 tones: romantic, playful, and luxury.',
+        status: 'soon',
+        action: null,
+        actionLabel: 'Not implemented yet'
+      })}
+      ${toolCard({
+        title: 'Pricing Calculator',
+        desc: 'Convert CNY supplier cost + shipping to recommended retail EUR/USD price with full margin breakdown.',
+        status: 'ready',
+        action: 'showPricingCalc()',
+        actionLabel: 'Calculate'
+      })}
+      ${toolCard({
+        title: 'Google Sheets Sync',
+        desc: 'Manually sync the product database with Google Sheets. Shows last sync time and total row count.',
+        status: 'soon',
+        action: null,
+        actionLabel: 'Not implemented yet'
+      })}
+      ${toolCard({
+        title: 'ManyChat Webhook Tester',
+        desc: 'Send a test payload to the configured ManyChat webhook URL and inspect the response for debugging DM flows.',
+        status: 'soon',
+        action: null,
+        actionLabel: 'Not implemented yet'
+      })}
+    </div>
+    <div id="pricing-calc-area"></div>`;
+}
+
+function showPricingCalc() {
+  const area = document.getElementById('pricing-calc-area');
+  if (!area) return;
+  area.innerHTML = `
+    <div class="modal-overlay" onclick="if(event.target===this)this.remove()">
+      <div class="modal" style="width:460px">
+        <div class="modal-title">Pricing Calculator</div>
+        <div class="modal-sub">Convert CNY cost to EUR/USD retail price with margin breakdown.</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>CNY Cost</label>
+            <input type="number" id="calc-cny" placeholder="e.g. 35" oninput="calcPrice()"/>
+          </div>
+          <div class="form-group">
+            <label>Shipping Est. (EUR)</label>
+            <input type="number" id="calc-ship" placeholder="e.g. 4" oninput="calcPrice()"/>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Target Margin %</label>
+            <input type="number" id="calc-margin" value="45" oninput="calcPrice()"/>
+          </div>
+          <div class="form-group">
+            <label>EUR/CNY Rate</label>
+            <input type="number" id="calc-rate" value="0.128" step="0.001" oninput="calcPrice()"/>
+          </div>
+        </div>
+        <div id="calc-result" style="background:var(--s3);border:1px solid var(--b1);border-radius:var(--r);padding:16px;margin-bottom:16px">
+          <div style="color:var(--t3);font-size:12px;text-align:center">Enter cost above to calculate</div>
+        </div>
+        <button class="btn" style="width:100%" onclick="this.closest('.modal-overlay').remove()">Close</button>
+      </div>
+    </div>`;
+}
+
+function calcPrice() {
+  const cny    = parseFloat(document.getElementById('calc-cny')?.value)    || 0;
+  const ship   = parseFloat(document.getElementById('calc-ship')?.value)   || 0;
+  const target = parseFloat(document.getElementById('calc-margin')?.value) || 45;
+  const rate   = parseFloat(document.getElementById('calc-rate')?.value)   || 0.128;
+  if (!cny) return;
+  const costEur   = +(cny * rate).toFixed(2);
+  const totalCost = +(costEur + ship).toFixed(2);
+  const retail    = +(totalCost / (1 - target / 100)).toFixed(2);
+  const marginEur = +(retail - totalCost).toFixed(2);
+  const marginPct = +(marginEur / retail * 100).toFixed(1);
+  const retailUsd = +(retail * 1.09).toFixed(2);
+  const res = document.getElementById('calc-result');
+  if (!res) return;
+  res.innerHTML = `
+    <div class="m3" style="margin-bottom:14px">
+      <div class="mbox">
+        <div class="mbox-lbl">CNY Cost</div>
+        <div class="mbox-val">¥${cny}</div>
+        <div class="mbox-sub">= €${costEur}</div>
+      </div>
+      <div class="mbox">
+        <div class="mbox-lbl">Total Cost</div>
+        <div class="mbox-val">€${totalCost}</div>
+        <div class="mbox-sub">incl. shipping</div>
+      </div>
+      <div class="mbox">
+        <div class="mbox-lbl">Margin</div>
+        <div class="mbox-val" style="color:var(--green)">${marginPct}%</div>
+        <div class="mbox-sub">€${marginEur}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:16px;align-items:center">
+      <div>
+        <div style="font-size:10px;color:var(--t4);font-family:var(--ff-m);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">Recommended EUR</div>
+        <div style="font-family:var(--ff-d);font-style:italic;font-size:32px;color:var(--accent)">€${retail}</div>
+      </div>
+      <div style="color:var(--t4);font-size:18px">/</div>
+      <div>
+        <div style="font-size:10px;color:var(--t4);font-family:var(--ff-m);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">Recommended USD</div>
+        <div style="font-family:var(--ff-d);font-style:italic;font-size:32px;color:var(--t2)">$${retailUsd}</div>
+      </div>
+    </div>`;
+}
+
+// ── Analytics sub-tabs ────────────────────────────────────────────────────────
+
+let analyticsTab = 'overview';
+
+function switchAnalyticsTab(tab) { analyticsTab = tab; renderAnalytics(); }
+
+function renderCrmTab() {
+  const contacts = [
+    { name: 'Sofia M.',   handle: '@sofia_milano',  lastMsg: '2025-05-07', interest: 'Rose Crystal Lamp',     status: 'Ordered',   notes: 'Asked about delivery time' },
+    { name: 'Emma W.',    handle: '@emma.writes',   lastMsg: '2025-05-06', interest: 'Crystal Necklace',       status: 'Delivered', notes: '' },
+    { name: 'Lena K.',    handle: '@lenaa_k',       lastMsg: '2025-05-06', interest: 'Infinity Bracelet',      status: 'Pending',   notes: 'Waiting for size confirmation' },
+    { name: 'Alice B.',   handle: '@alice.beauty',  lastMsg: '2025-05-05', interest: 'Heart Candle Set',       status: 'Lead',      notes: 'Interested, hesitant on price' },
+    { name: 'Maria T.',   handle: '@mariatravels',  lastMsg: '2025-05-04', interest: 'Personalized Ring',      status: 'Shipped',   notes: '' },
+    { name: 'Hannah J.',  handle: '@hjones_style',  lastMsg: '2025-05-03', interest: 'Moon Lamp',              status: 'Cancelled', notes: 'Changed mind' },
+    { name: 'Clara V.',   handle: '@clarav_paris',  lastMsg: '2025-05-03', interest: 'Velvet Gift Box',        status: 'Ordered',   notes: '' },
+    { name: 'Priya S.',   handle: '@priya.sunshine',lastMsg: '2025-05-02', interest: 'Rose Petal Bracelet',    status: 'Lead',      notes: 'Needs gift wrapping option' },
+  ];
+  const statusColor = { Lead:'badge-gray', Pending:'badge-amber', Ordered:'badge-blue', Shipped:'badge-purple', Delivered:'badge-green', Cancelled:'badge-red' };
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select style="width:auto;padding:6px 10px;font-size:12px">
+          <option>All statuses</option>
+          <option>Lead</option><option>Pending</option><option>Ordered</option>
+          <option>Shipped</option><option>Delivered</option><option>Cancelled</option>
+        </select>
+        <span style="font-size:11px;color:var(--t4);font-family:var(--ff-m)">Mock data — wire to ManyChat API</span>
+      </div>
+      <button class="btn btn-sm">Export CSV</button>
+    </div>
+    <div class="catalog-table-wrap">
+      <table class="catalog-table">
+        <thead><tr>
+          <th>Name</th><th>Instagram</th><th>Last Message</th>
+          <th>Product Interest</th><th>Order Status</th><th>Notes</th>
+        </tr></thead>
+        <tbody>
+          ${contacts.map(c => `
+            <tr class="cat-row">
+              <td><span style="font-weight:500;color:var(--t1)">${escHtml(c.name)}</span></td>
+              <td><span style="font-family:var(--ff-m);font-size:11px;color:var(--accent)">${escHtml(c.handle)}</span></td>
+              <td><span style="font-size:11px;color:var(--t3);font-family:var(--ff-m)">${c.lastMsg}</span></td>
+              <td>${escHtml(c.interest)}</td>
+              <td><span class="badge ${statusColor[c.status]||'badge-gray'}">${c.status}</span></td>
+              <td><span style="font-size:11px;color:var(--t3)">${escHtml(c.notes)||'—'}</span></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function renderMarginsTab() {
+  const products = [
+    { name: 'Rose Crystal Lamp',        supplier: 'AliExpress', cny: 28, ship: 4.5,  price: 34.90 },
+    { name: 'Infinity Love Bracelet',   supplier: '1688',       cny: 12, ship: 3.0,  price: 24.90 },
+    { name: 'Heart-shaped Candle Set',  supplier: 'Taobao',     cny: 18, ship: 5.0,  price: 29.90 },
+    { name: 'Personalized Moon Necklace',supplier: '1688',      cny: 22, ship: 4.0,  price: 39.90 },
+    { name: 'Luxury Velvet Gift Box',   supplier: 'AliExpress', cny: 35, ship: 6.0,  price: 49.90 },
+    { name: 'Rose Petal Charm Bracelet',supplier: 'Taobao',     cny: 15, ship: 3.5,  price: 22.90 },
+  ];
+  let totalMargin = 0;
+  const rows = products.map(p => {
+    const eurCost   = +(p.cny * 0.128).toFixed(2);
+    const totalCost = +(eurCost + p.ship).toFixed(2);
+    const marginEur = +(p.price - totalCost).toFixed(2);
+    const marginPct = +((marginEur / p.price) * 100).toFixed(1);
+    totalMargin += marginPct;
+    const col = marginPct >= 40 ? 'var(--green)' : marginPct >= 20 ? 'var(--amber)' : 'var(--red)';
+    return `<tr class="cat-row">
+      <td><span style="font-weight:500;color:var(--t1)">${escHtml(p.name)}</span></td>
+      <td><span style="font-size:11px;color:var(--t3)">${p.supplier}</span></td>
+      <td><span style="font-family:var(--ff-m);font-size:12px">¥${p.cny}</span></td>
+      <td><span style="font-family:var(--ff-m);font-size:12px">€${eurCost}</span></td>
+      <td><span style="font-family:var(--ff-m);font-size:12px">€${p.ship}</span></td>
+      <td><span style="font-family:var(--ff-m);font-size:12px;font-weight:600;color:var(--t1)">€${p.price}</span></td>
+      <td><span style="font-family:var(--ff-m);font-size:12px;color:var(--green)">€${marginEur}</span></td>
+      <td><span style="font-family:var(--ff-m);font-size:12px;font-weight:700;color:${col}">${marginPct}%</span></td>
+    </tr>`;
+  }).join('');
+  const avgMargin = (totalMargin / products.length).toFixed(1);
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap">
+      <span style="font-size:11px;color:var(--t4);font-family:var(--ff-m)">Mock data — will sync from Google Sheets when implemented</span>
+      <button class="btn btn-sm">Import from Sheets</button>
+    </div>
+    <div class="catalog-table-wrap">
+      <table class="catalog-table">
+        <thead><tr>
+          <th>Product</th><th>Supplier</th><th>CNY Cost</th>
+          <th>EUR Cost</th><th>Shipping</th><th>Sell Price</th><th>Margin €</th><th>Margin %</th>
+        </tr></thead>
+        <tbody>
+          ${rows}
+          <tr style="border-top:2px solid var(--b2)">
+            <td colspan="7" style="text-align:right;font-size:11px;color:var(--t3);font-family:var(--ff-m);padding-right:12px">Average margin</td>
+            <td><span style="font-family:var(--ff-m);font-size:13px;font-weight:700;color:var(--amber)">${avgMargin}%</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>`;
+}
+
 const PAGE_RENDERERS = {
+  tools:     renderTools,
   dashboard: renderDashboard,
-  scan:      renderScan,
   pipeline:  renderPipeline,
   queue:     renderQueue,
   textEdit:  renderTextEdit,
@@ -2376,9 +2660,20 @@ async function renderPage() {
 // ── Analytics ────────────────────────────────────────────────────────────────
 
 async function renderAnalytics() {
-  setTitle('Analytics');
+  const tabLabels = { overview: 'Overview', crm: 'CRM', margins: 'Margins' };
+  setTitle('Analytics', tabLabels[analyticsTab] || 'Overview');
   document.getElementById('topbar-actions').innerHTML = '';
   const el = document.getElementById('content');
+
+  const tabBar = `<div class="catalog-tabs" style="margin-bottom:20px">
+    <button class="cat-tab ${analyticsTab==='overview'?'active':''}" onclick="switchAnalyticsTab('overview')">Overview</button>
+    <button class="cat-tab ${analyticsTab==='crm'?'active':''}" onclick="switchAnalyticsTab('crm')">CRM</button>
+    <button class="cat-tab ${analyticsTab==='margins'?'active':''}" onclick="switchAnalyticsTab('margins')">Margins</button>
+  </div>`;
+
+  if (analyticsTab === 'crm') { el.innerHTML = tabBar + renderCrmTab(); return; }
+  if (analyticsTab === 'margins') { el.innerHTML = tabBar + renderMarginsTab(); return; }
+
   el.innerHTML = '<div style="color:var(--t3);font-size:12px;padding:40px 0;text-align:center">Loading analytics…</div>';
 
   const [data] = await Promise.all([
@@ -2457,7 +2752,7 @@ async function renderAnalytics() {
       <span style="color:var(--t3)">${p.cnt}</span>
     </div>`).join('');
 
-  el.innerHTML = `
+  el.innerHTML = tabBar + `
     <div class="an-page">
 
       <div class="dash-stat-grid" style="margin-bottom:16px">
@@ -2532,13 +2827,13 @@ let chatHistory = [];
 let chatPending = false;
 
 const QUICK_ACTIONS = [
-  { label: '🔍 Review pending', msg: 'Review all my pending products and tell me which to approve and which to reject.' },
-  { label: '🔍 Find rejected gems', msg: 'Review all rejected products and find any that were wrongly rejected or have borderline scores worth reconsidering.' },
-  { label: "📊 Today's summary", msg: "Give me a brief summary of the current pipeline status and any recommendations." },
-  { label: '✅ Show approved', msg: 'Show me all currently approved products so I can review them.' },
-  { label: '📝 Edit pending titles', msg: 'Look at my pending products and suggest better, more premium English titles and prices for them.' },
-  { label: '🔑 Keyword advice', msg: 'Based on keyword performance, what keywords should I add, remove or prioritise?' },
-  { label: '✨ Best candidates', msg: 'From the rejected products, which 5-10 are the best candidates to reconsider? List them with IDs.' },
+  { label: 'Generate caption', msg: 'Generate 3 Instagram captions (romantic, playful, luxury tone) for one of my recently approved products.' },
+  { label: "Check today's queue", msg: "Give me a brief summary of the current pipeline status and any recommendations." },
+  { label: 'Show low margin products', msg: 'Which of my products have the lowest margin? List them with prices and suggestions.' },
+  { label: "Summarize this week's sales", msg: "Summarize this week's performance: posts published, pipeline stats, and key recommendations." },
+  { label: '✅ Show approved', msg: 'Show me all currently approved products ready to post.' },
+  { label: '📝 Improve pending titles', msg: 'Look at my pending products and suggest better, more premium English titles for them.' },
+  { label: '✨ Best rejected gems', msg: 'From the rejected products, which 5-10 are the best candidates to reconsider? List them with IDs.' },
 ];
 
 function chatAppend(role, text, meta = {}) {
@@ -2884,10 +3179,7 @@ const _navClickClose = (page) => {
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 function chooseStartPage() {
-  if ((stats.SCRAPED || 0) > 0) return 'queue';
-  if ((stats.ENRICHED || 0) > 0) return 'textEdit';
-  if ((stats.REVIEWED || 0) > 0) return 'REVIEWED';
-  return 'dashboard';
+  return 'tools';
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────

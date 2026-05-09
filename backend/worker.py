@@ -25,7 +25,6 @@ import json
 # ── Absolute imports (backend/ is on sys.path, NOT a package) ──────────────────
 from database import db
 from models import ProductStage          # NOT from main — that causes a circular import
-from services.enrichment import enrich_product
 from services.images import process_image
 from services.publisher import publish_to_instagram
 
@@ -100,13 +99,6 @@ async def run_worker_loop():
                 title = p.get("title_translated") or p.get("product_name") or p.get("title") or ""
                 description = p.get("description_translated") or p.get("description") or ""
 
-                # a. English caption via OpenAI (gpt-4o-mini)
-                try:
-                    enriched_data = await enrich_product(title, description)
-                except Exception as e:
-                    log.error("Worker: Text enrichment failed for pid=%d: %s", pid, e)
-                    enriched_data = {"caption": f"{title}\n\n{description}", "hashtags": []}
-
                 # b. Download + compress + upload to Supabase Storage
                 images = p.get("images") or []
                 raw_image_url = images[0] if images else p.get("image_url", "")
@@ -123,8 +115,8 @@ async def run_worker_loop():
 
                 # c. Persist everything in one DB update
                 updates = {
-                    "caption": enriched_data.get("caption", ""),
-                    "hashtags_json": json.dumps(enriched_data.get("hashtags", [])),
+                    "caption": res.get("caption") or p.get("caption") or "",
+                    "hashtags_json": json.dumps(res.get("hashtags") or p.get("hashtags") or []),
                     "product_name": res.get("product_name", p.get("product_name", "")),
                     "stage": ProductStage.ENRICHED.value,
                 }

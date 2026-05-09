@@ -619,6 +619,7 @@ async def get_catalog(limit: int = 100, offset: int = 0, category: Optional[str]
             "keyword":           p.get("keyword") or "",
             "caption":           p.get("caption") or "",
             "description":       p.get("description") or "",
+            "score":             p.get("score") or 0,
         })
         
     return {
@@ -797,15 +798,18 @@ async def remove_product_text(product_id: int):
     # Upload to Supabase for persistence across Railway restarts
     supabase_url = await upload_product_image(cleaned, f"cleaned_{product_id}")
 
+    # Original CDN images (excluding any prior cleaned proxy URLs)
+    original_imgs = [img for img in (p.get("images") or []) if img and "/api/products/" not in img]
+
     if supabase_url:
+        # Permanent Supabase URL — no need to keep original (avoids carousel posting both)
         new_url = supabase_url
+        imgs = [new_url] + [img for img in original_imgs if img != url]
     else:
+        # Ephemeral Railway URL — keep original as emergency fallback for serve_cleaned_image
         base = str(settings.get("public_base_url") or "").rstrip("/")
         new_url = f"{base}/api/products/{product_id}/cleaned-image" if base else f"/api/products/{product_id}/cleaned-image"
-
-    # Keep original CDN URLs as fallback (filter out any prior cleaned-image URLs)
-    original_imgs = [img for img in (p.get("images") or []) if img and "/api/products/" not in img]
-    imgs = [new_url] + original_imgs
+        imgs = [new_url, url] + [img for img in original_imgs if img != url]
     await db.update_product_fields(product_id, {"images_json": json.dumps(imgs), "has_chinese_text": False})
     await db.set_stage(product_id, ProductStage.REVIEWED.value)
     return {"ok": True, "image_url": new_url}

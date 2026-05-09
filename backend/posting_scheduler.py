@@ -39,6 +39,7 @@ def create_posting_scheduler(get_settings_fn: Callable[[], Coroutine]) -> AsyncI
     # Import here to avoid circular imports at module level
     from database import db
     import instagram
+    from models import ProductStage
 
     scheduler = AsyncIOScheduler()
 
@@ -53,7 +54,7 @@ def create_posting_scheduler(get_settings_fn: Callable[[], Coroutine]) -> AsyncI
 
             posts_per_slot = max(1, int(settings.get("posts_per_slot", 1)))
             products = await db.get_products(
-                stage="approved", limit=posts_per_slot, sort="score"
+                stage=ProductStage.REVIEWED.value, limit=posts_per_slot, sort="score"
             )
 
             if not products:
@@ -66,7 +67,7 @@ def create_posting_scheduler(get_settings_fn: Callable[[], Coroutine]) -> AsyncI
             for product, result in zip(products, results):
                 pid = product["id"]
                 if result.status in {"posted", "mock"}:
-                    await db.set_stage(pid, "posted")
+                    await db.set_stage(pid, ProductStage.LIVE.value)
                     await db.log_post(pid)
                     log.info(
                         "Peak-post ✓ product_id=%d status=%s", pid, result.status

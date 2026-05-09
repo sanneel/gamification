@@ -87,10 +87,11 @@ async def _create_container(
     token: str,
     image_url: str,
     caption: str,
+    settings: dict,
 ) -> str:
     """Step 1: create a single-image media container. Returns creation_id."""
     resp = await client.post(
-        f"{_graph()}/{ig_user_id}/media",
+        f"{_graph(settings)}/{ig_user_id}/media",
         params={
             "image_url":    image_url,
             "caption":      caption,
@@ -162,10 +163,11 @@ async def _publish_container(
     ig_user_id: str,
     token: str,
     creation_id: str,
+    settings: dict,
 ) -> str:
     """Step 2: publish the container. Returns the media ID."""
     resp = await client.post(
-        f"{_graph()}/{ig_user_id}/media_publish",
+        f"{_graph(settings)}/{ig_user_id}/media_publish",
         params={
             "creation_id":  creation_id,
             "access_token": token,
@@ -181,10 +183,11 @@ async def _get_post_shortcode(
     client: httpx.AsyncClient,
     media_id: str,
     token: str,
+    settings: dict,
 ) -> str:
     """Fetch the shortcode so we can build the post URL."""
     resp = await client.get(
-        f"{_graph()}/{media_id}",
+        f"{_graph(settings)}/{media_id}",
         params={"fields": "shortcode", "access_token": token},
     )
     body = resp.json()
@@ -265,7 +268,7 @@ async def post_product(product: dict, settings: dict) -> PostResult:
                         len(children), pid,
                     )
                     creation_id = await _create_container(
-                        client, user_id, token, image_urls[0], full_caption
+                        client, user_id, token, image_urls[0], full_caption, settings
                     )
                 else:
                     creation_id = await _create_carousel_album(
@@ -275,15 +278,15 @@ async def post_product(product: dict, settings: dict) -> PostResult:
                 # ── Single image post ──────────────────────────────────────────
                 log.info("Instagram: creating media container for product %s", pid)
                 creation_id = await _create_container(
-                    client, user_id, token, image_urls[0], full_caption
+                    client, user_id, token, image_urls[0], full_caption, settings
                 )
 
             await _wait_until_container_ready(client, creation_id, token, settings)
 
             log.info("Instagram: publishing container %s", creation_id)
-            media_id = await _publish_container(client, user_id, token, creation_id)
+            media_id = await _publish_container(client, user_id, token, creation_id, settings)
 
-            shortcode = await _get_post_shortcode(client, media_id, token)
+            shortcode = await _get_post_shortcode(client, media_id, token, settings)
             post_url  = f"https://www.instagram.com/p/{shortcode}/"
 
         log.info(

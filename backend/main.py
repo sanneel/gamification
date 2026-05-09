@@ -517,9 +517,13 @@ async def _restore_database_from_sheets() -> dict:
 async def _sync_sheets_after_startup() -> None:
     try:
         await asyncio.to_thread(sheets.verify_writable)
-    except Exception: pass
-    await _restore_database_from_sheets()
-    await _configure_sheets_from_settings()
+        # Restore settings only on startup to maintain environment consistency
+        remote_settings = await asyncio.to_thread(sheets.load_settings)
+        if remote_settings:
+            await db.update_settings(remote_settings)
+        await _configure_sheets_from_settings()
+    except Exception as e:
+        log.warning("Startup sheets sync failed: %s", e)
 
 async def _backup_settings_to_sheets() -> dict:
     try:
@@ -657,10 +661,16 @@ async def update_settings(body: SettingsUpdate):
 
 @app.post("/api/admin/reset-database")
 async def reset_database():
-    """DANGER: Erases all product data from the database."""
+    """DANGER: Erases all product data from the database and Google Sheets."""
     try:
         await db.truncate_product_data()
-        return {"ok": True, "message": "Database reset successfully."}
+        # Also clear the Google Sheet if connected, to prevent auto-restore issues
+        try:
+            await _backup_products_to_sheets()
+        except Exception as e:
+            log.warning("Could not clear Google Sheet during reset: %s", e)
+            
+        return {"ok": True, "message": "Database and cloud backup reset successfully."}
     except Exception as e:
         log.error("Database reset failed: %s", e)
         raise HTTPException(500, detail=f"Reset failed: {str(e)}")

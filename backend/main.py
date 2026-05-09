@@ -792,8 +792,25 @@ async def serve_cleaned_image(product_id: int):
         path = f"{_COLLAGE_DIR}/cleaned_{product_id}.jpg"
         if os.path.exists(path):
             with open(path, "rb") as f: data = f.read()
-    if not data: raise HTTPException(404, "Not found")
-    return Response(content=data, media_type="image/jpeg")
+    if data:
+        return Response(content=data, media_type="image/jpeg")
+    # File lost after container restart — proxy the original image so URLs stay valid
+    product = await db.get_product(product_id)
+    if product:
+        fallback = next(
+            (img for img in (product.get("images") or []) if img and "/cleaned-image" not in img),
+            None,
+        )
+        if fallback:
+            try:
+                async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+                    resp = await client.get(fallback)
+                if resp.status_code == 200:
+                    ct = resp.headers.get("content-type", "image/jpeg")
+                    return Response(content=resp.content, media_type=ct)
+            except Exception:
+                pass
+    raise HTTPException(404, "Not found")
 
 @app.patch("/api/products/{product_id}/note")
 async def update_note(product_id: int, body: NoteUpdate):

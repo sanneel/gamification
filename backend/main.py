@@ -852,7 +852,33 @@ async def ai_chat(body: ChatRequest):
 
 @app.get("/api/instagram/accounts")
 async def instagram_accounts():
-    return {"accounts": []}
+    settings = await _settings()
+    token = str(settings.get("instagram_access_token") or "").strip()
+    if not token:
+        raise HTTPException(400, detail="No Instagram access token configured. Paste your token first.")
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.get(
+            "https://graph.facebook.com/v23.0/me/accounts",
+            params={"access_token": token, "fields": "id,name,instagram_business_account"},
+        )
+        body = resp.json()
+
+    if "error" in body:
+        msg = body["error"].get("message", str(body["error"]))
+        raise HTTPException(400, detail=msg)
+
+    accounts = []
+    for page in body.get("data", []):
+        ig = page.get("instagram_business_account")
+        if ig and ig.get("id"):
+            accounts.append({
+                "page_id": page["id"],
+                "page_name": page.get("name", ""),
+                "instagram_business_account_id": ig["id"],
+            })
+
+    return {"accounts": accounts}
 
 @app.get("/api/instagram/diagnostics")
 async def instagram_diagnostics(product_id: Optional[int] = None):

@@ -1549,6 +1549,21 @@ async function renderSettings() {
             <b style="color:var(--t1)">Tip:</b> After saving a key, click <b>Test</b> to verify it works.
           </div>
         </div>
+
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;user-select:none">
+            <input type="checkbox" id="s-context-injection" ${s.ai_context_injection ? 'checked' : ''}
+              style="width:16px;height:16px;margin-top:2px;flex-shrink:0;accent-color:var(--accent)"/>
+            <div>
+              <div style="font-size:13px;color:var(--t1);font-weight:500">Decision-memory context injection</div>
+              <div style="font-size:11px;color:var(--t3);margin-top:3px;line-height:1.6">
+                When ON, appends a compact summary of past accepted/rejected decisions to the Gemini scoring prompt.
+                Default: OFF. Requires at least 10 reviewed products to have any effect.
+                Use <b>Analytics → Injection Stats</b> to compare results.
+              </div>
+            </div>
+          </label>
+        </div>
       </div>
 
       <div class="card" style="grid-column:1/-1">
@@ -1900,7 +1915,8 @@ async function saveSettings() {
     public_base_url:           g('s-public-url')?.value    || '',
     cssbuy_username:      g('s-cssbuy-user')?.value    || '',
     cssbuy_source:        g('s-cssbuy-source')?.value  || '1688',
-    local_scraping_only:  g('s-local-only')?.checked ?? false,
+    local_scraping_only:        g('s-local-only')?.checked ?? false,
+    ai_context_injection:       g('s-context-injection')?.checked ?? false,
   };
   includeIfNonEmpty(data, 'instagram_access_token', g('s-ig-token')?.value);
   includeIfNonEmpty(data, 'instagram_webhook_token', g('s-webhook-token')?.value);

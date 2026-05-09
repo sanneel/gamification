@@ -60,6 +60,8 @@ from scheduler import create_scheduler, get_scheduler_status
 import instagram
 import sheets
 import ai_assistant
+import decision_memory
+import preference_analyzer
 from utils.google_auth import configure_google_credentials_from_env
 from worker import run_worker_loop, process_queued_items
 
@@ -910,6 +912,77 @@ async def get_analytics():
     data = await db.get_analytics()
     data["stats"] = await db.get_stats()
     return data
+
+# ── Decision Intelligence (read-only, no AI calls) ───────────────────────────
+
+@app.get("/api/ai/decision-stats")
+async def get_decision_stats():
+    """
+    Returns raw decision-history statistics aggregated from the products and
+    pipeline_products tables.  No AI calls; fast and safe to poll.
+    """
+    return await decision_memory.build_summary(db)
+
+
+@app.post("/api/ai/analyze")
+async def analyze_decisions():
+    """
+    Runs the deterministic preference analyzer over the current decision history,
+    stores findings in ai_recommendations, and returns them.
+    Previous non-dismissed recommendations are cleared first so results stay fresh.
+    """
+    settings = await _settings()
+    summary = await decision_memory.build_summary(db)
+    findings, status = preference_analyzer.analyze(summary, settings)
+
+    await db.clear_active_recommendations()
+    for f in findings:
+        await db.save_recommendation(f)
+
+    return {"findings": findings, "count": len(findings), "status": status}
+
+
+@app.get("/api/ai/recommendations")
+async def get_recommendations(include_dismissed: bool = False):
+    """Returns stored AI recommendations, newest first."""
+    recs = await db.get_recommendations(include_dismissed=include_dismissed)
+    return {"recommendations": recs, "count": len(recs)}
+
+
+@app.post("/api/ai/recommendations/{rec_id}/dismiss")
+async def dismiss_recommendation(rec_id: int):
+    """Mark a recommendation as dismissed so it is hidden from the default view."""
+    await db.dismiss_recommendation(rec_id)
+    return {"ok": True}
+
+
+@app.get("/api/ai/injection-stats")
+async def get_injection_stats():
+    """
+    Aggregate comparison of enrichment batches scored with context injection ON
+    vs OFF.  Use this to evaluate whether enabling ai_context_injection changes
+    acceptance rates or score distributions.
+
+    Groups:
+      with_injection    — batches where snippet_injected=1 (flag ON, history sufficient)
+      without_injection — all other batches (flag OFF, insufficient history, or error)
+      by_skip_reason    — full breakdown including flag_off / insufficient_history / error
+    """
+    return await db.get_injection_stats()
+
+
+@app.get("/api/ai/injection-log")
+async def get_injection_log(limit: int = 50):
+    """
+    Recent enrichment batch log records, newest first.
+    Each row represents one worker batch: flag state, snippet presence,
+    snippet length, skip reason, batch size, accepted/rejected counts, avg score.
+    """
+    if limit > 200:
+        limit = 200
+    rows = await db.get_injection_log(limit)
+    return {"log": rows, "count": len(rows)}
+
 
 class ChatRequest(BaseModel):
     message: str

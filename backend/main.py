@@ -52,7 +52,7 @@ sys.path.insert(0, BASE_DIR)
 # Import local modules
 from models import ProductStage
 from config.runtime import get_config, merge_env_with_settings, sanitize_settings
-from image_editor import remove_text as clipdrop_remove_text
+from image_editor import remove_text as clipdrop_remove_text, _convert_to_jpeg
 from database import db, init_db
 from runner import process_scraped_products, run_pipeline
 from scheduler import create_scheduler, get_scheduler_status
@@ -698,10 +698,13 @@ async def proxy_image(url: str):
         async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
             r = await client.get(src, headers={"User-Agent": "Mozilla/5.0", "Referer": "https://www.1688.com/"})
         if r.status_code != 200: raise HTTPException(r.status_code, "Fetch failed")
-        content_type = r.headers.get("content-type", "")
+        content_type = r.headers.get("content-type", "").split(";")[0].strip()
         if not content_type.startswith("image/"):
             raise HTTPException(415, "URL does not point to an image")
-        return Response(content=r.content, media_type=content_type, headers={"Cache-Control": "public, max-age=86400"})
+        img_bytes = r.content
+        if content_type not in ("image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"):
+            img_bytes, content_type = _convert_to_jpeg(img_bytes, content_type)
+        return Response(content=img_bytes, media_type=content_type, headers={"Cache-Control": "public, max-age=86400"})
     except Exception as e:
         raise HTTPException(502, f"Proxy failed: {e}")
 
@@ -811,8 +814,11 @@ async def serve_cleaned_image(product_id: int):
                 async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
                     resp = await client.get(fallback)
                 if resp.status_code == 200:
-                    ct = resp.headers.get("content-type", "image/jpeg")
-                    return Response(content=resp.content, media_type=ct)
+                    ct = resp.headers.get("content-type", "image/jpeg").split(";")[0].strip()
+                    img_bytes = resp.content
+                    if ct not in ("image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"):
+                        img_bytes, ct = _convert_to_jpeg(img_bytes, ct)
+                    return Response(content=img_bytes, media_type="image/jpeg")
             except Exception:
                 pass
     raise HTTPException(404, "Not found")

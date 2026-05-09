@@ -7,33 +7,32 @@ log = logging.getLogger(__name__)
 
 async def enrich_product(title: str, description: str) -> dict:
     """
-    Prompts the LLM to return a clean, native-English Instagram caption
-    and 5 relevant hashtags in JSON format.
+    Prompts the LLM to return a Georgian Instagram caption and relevant hashtags.
     """
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         log.warning("OPENAI_API_KEY not set. Using fallback mock data for enrichment.")
         return {
-            "caption": f"🌟 Check out this amazing product: {title}\n\nPerfect for your everyday needs. Don't miss out! ✨",
-            "hashtags": ["#musthave", "#shopping", "#deals", "#trendy", "#lifestyle"]
+            "caption": f"✨ {title}\n\nიდეალური საჩუქარი საყვარელი ადამიანისთვის.",
+            "hashtags": ["#წყვილი", "#საჩუქარი", "#სიყვარული", "#couplegoals", "#giftideas"]
         }
 
     client = AsyncOpenAI(api_key=api_key)
     prompt = (
-        f"Create a native-English Instagram caption for the following product:\n"
-        f"Title: {title}\n"
-        f"Description: {description}\n\n"
-        "Return the output STRICTLY as a JSON object with two keys:\n"
-        "1. 'caption': A fun, engaging Instagram caption (include a few emojis).\n"
-        "2. 'hashtags': An array of 5 relevant hashtags.\n"
-        "Do not include any other text, just the raw JSON."
+        f"შექმენი Instagram-ის პოსტის კაფსი ქართულ ენაზე შემდეგი პროდუქტისთვის:\n"
+        f"სათაური: {title}\n"
+        f"აღწერა: {description}\n\n"
+        "დააბრუნე ᲛᲮᲝᲚᲝᲓ JSON ობიექტი ორი გასაღებით:\n"
+        "1. 'caption': მიმზიდველი, ემოციური ქართული კაფსი (2-3 წინადადება, ემოჯი).\n"
+        "2. 'hashtags': მასივი 5 ჰეშთეგით (ნაზავი ქართული და ინგლისური).\n"
+        "სხვა ტექსტი არ დაამატო."
     )
 
     try:
         response = await client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are an expert social media manager and copywriter."},
+                {"role": "system", "content": "შენ ხარ ექსპერტი სოციალური მედიის მენეჯერი. წერ ქართულ Instagram კაფსებს წყვილების სასაჩუქრე მაღაზიისთვის 'წყვილი'."},
                 {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"},

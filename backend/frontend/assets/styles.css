@@ -696,6 +696,15 @@ span.pcard-score.lo { color: var(--red); }
 }
 .pca-clean:hover { background: rgba(179,155,193,.18); }
 .pca-clean:disabled { opacity: .7; cursor: wait; }
+.pca-website {
+  padding: 10px 12px;
+  background: var(--s1);
+  color: var(--green);
+  font-size: 13px; cursor: pointer; transition: all .15s var(--ease);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.pca-website:hover { background: rgba(74,179,120,.12); }
 
 .clean-spinner {
   display: inline-block; width: 10px; height: 10px;

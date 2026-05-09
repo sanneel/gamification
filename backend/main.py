@@ -598,10 +598,8 @@ async def robots_txt_api():
 
 @app.get("/api/catalog")
 async def get_catalog(limit: int = 100, offset: int = 0, category: Optional[str] = None):
-    """Consolidated endpoint for the public storefront."""
-    reviewed = await db.get_products(stage=ProductStage.REVIEWED.value, limit=limit, offset=offset)
-    live = await db.get_products(stage=ProductStage.LIVE.value, limit=limit, offset=offset)
-    products = reviewed + live
+    """Public storefront — only returns LIVE (published) products."""
+    products = await db.get_products(stage=ProductStage.LIVE.value, limit=limit, offset=offset)
     
     # 1. Existing category filtering logic
     if category:
@@ -716,6 +714,16 @@ async def approve_product(product_id: int):
     await db.set_stage(product_id, stage)
     await _backup_products_to_sheets()
     return {"ok": True, "stage": stage}
+
+@app.post("/api/products/{product_id}/publish-website")
+async def publish_to_website(product_id: int):
+    """Publish a product directly to the website catalog (sets LIVE, no Instagram posting)."""
+    p = await _get_product_or_404(product_id)
+    if p.get("stage") not in (ProductStage.REVIEWED.value, ProductStage.ENRICHED.value):
+        raise HTTPException(400, f"Product must be in REVIEWED stage to publish to website (current: {p.get('stage')})")
+    await db.set_stage(product_id, ProductStage.LIVE.value)
+    await _backup_products_to_sheets()
+    return {"ok": True}
 
 @app.post("/api/approve")
 async def approve_products(body: ApproveRequest):

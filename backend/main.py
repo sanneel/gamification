@@ -990,13 +990,17 @@ async def _run_ingest(job_id: int, products: list) -> None:
 async def _post_and_export(products: list) -> None:
     if not products: return
     try:
+        # Publish to website immediately — Instagram may still be in-flight
+        for p in products:
+            await db.set_stage(p["id"], ProductStage.LIVE.value)
+            await db.log_post(p["id"])
+
         settings = await _settings()
         results = await instagram.post_batch(products, settings)
         for p in products:
             res = next((r for r in results if r.product_id == p["id"]), None)
-            if res and res.status in ("posted", "mock"):
-                await db.set_stage(p["id"], ProductStage.LIVE.value)
-                await db.log_post(p["id"])
+            if res and res.status == "error":
+                log.warning("Instagram post failed for product %s: %s", p["id"], res.error)
         await asyncio.to_thread(sheets.append_rows, products)
         await _backup_products_to_sheets()
     except Exception as e:

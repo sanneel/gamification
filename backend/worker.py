@@ -19,6 +19,7 @@ from database import db
 from models import ProductStage          # NOT from main — that causes a circular import
 from services.images import process_image
 from services.publisher import publish_to_instagram
+import decision_memory
 
 
 log = logging.getLogger(__name__)
@@ -57,9 +58,35 @@ async def run_worker_loop():
             settings = await db.get_settings()
             log.info("Worker: Running Batch Vision AI for %d products...", len(products))
 
+            # ── Decision-memory context injection (feature flag: ai_context_injection) ──
+            # When OFF (default): context_snippet=None → Gemini call is byte-for-byte
+            # identical to the pre-Phase-2 baseline.
+            # When ON: a compact aggregate summary is appended to the system prompt.
+            # Built once per batch iteration — one DB read, not one per product.
+            flag_on: bool = bool(settings.get("ai_context_injection"))
+            context_snippet: str | None = None
+            skip_reason: str | None = None   # recorded in enrichment_log
+
+            if flag_on:
+                try:
+                    summary = await decision_memory.build_summary(db)
+                    context_snippet = decision_memory.build_context_snippet(summary)
+                    if context_snippet:
+                        log.debug("Worker: injecting decision-memory context (%d chars)", len(context_snippet))
+                    else:
+                        skip_reason = "insufficient_history"
+                        log.debug("Worker: ai_context_injection ON but insufficient history — skipping")
+                except Exception as exc:
+                    skip_reason = "error"
+                    # Never let a failed context build block enrichment.
+                    log.warning("Worker: decision-memory context build failed (%s) — proceeding without it", exc)
+                    context_snippet = None
+            else:
+                skip_reason = "flag_off"
+
             # Deferred import avoids circular dependency at module load time
             from enrichment import ai_enrich_batch
-            batch_results = await ai_enrich_batch(products, settings)
+            batch_results = await ai_enrich_batch(products, settings, context_snippet)
 
             for i, p in enumerate(products):
                 pid = p["id"]
@@ -123,6 +150,26 @@ async def run_worker_loop():
 
                 await db.update_product_fields(pid, updates)
                 log.info("Worker: pid=%d → ENRICHED.", pid)
+
+            # ── Observability: log batch metadata for injection comparison ─────
+            # Fire-and-forget — a write failure must never block the worker loop.
+            try:
+                scores = [
+                    r["score"] for r in batch_results
+                    if isinstance(r.get("score"), (int, float))
+                ]
+                await db.log_enrichment_batch({
+                    "flag_on":          int(flag_on),
+                    "snippet_injected": int(bool(context_snippet)),
+                    "snippet_length":   len(context_snippet) if context_snippet else 0,
+                    "skip_reason":      skip_reason,
+                    "batch_size":       len(products),
+                    "accepted_count":   sum(1 for r in batch_results if r.get("store_match")),
+                    "rejected_count":   sum(1 for r in batch_results if not r.get("store_match")),
+                    "avg_score":        round(sum(scores) / len(scores), 2) if scores else None,
+                })
+            except Exception as exc:
+                log.warning("Worker: enrichment_log write failed (%s) — non-critical", exc)
 
             # Brief pause before next batch
             await asyncio.sleep(2)

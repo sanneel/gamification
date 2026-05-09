@@ -141,8 +141,20 @@ def _clean_name(product: dict) -> str:
     return " ".join(title.split()[:5])
 
 
-def _build_system_prompt(template: str, settings: dict) -> str:
-    return template
+def _build_system_text(context_snippet: str | None) -> str:
+    """
+    Return the system prompt text for a Gemini call.
+
+    When context_snippet is None (flag OFF or no data): returns the base prompt
+    unchanged — behavior is identical to the pre-Phase-2 baseline.
+
+    When context_snippet is a non-empty string (flag ON, enough history):
+    appends it as a clearly delimited addendum.  The base curation rules and
+    scoring weights are never modified.
+    """
+    if not context_snippet:
+        return _GEMINI_SYSTEM
+    return f"{_GEMINI_SYSTEM}\n{context_snippet}"
 
 
 # ── Mock enrichment ────────────────────────────────────────────────────────────
@@ -220,7 +232,7 @@ async def _fetch_image_b64(url: str) -> Optional[tuple]:
     return None
 
 
-async def gemini_enrich(product: dict, settings: dict) -> Optional[dict]:
+async def gemini_enrich(product: dict, settings: dict, context_snippet: str | None = None) -> Optional[dict]:
     global _GEMINI_QUOTA_EXHAUSTED
     api_key = get_config("GEMINI_KEY", settings.get("gemini_key", ""))
     if not api_key:
@@ -253,7 +265,7 @@ async def gemini_enrich(product: dict, settings: dict) -> Optional[dict]:
         log.debug("Gemini: text-only (no image available) for '%s'", title[:40])
 
     payload = {
-        "system_instruction": {"parts": [{"text": _GEMINI_SYSTEM}]},
+        "system_instruction": {"parts": [{"text": _build_system_text(context_snippet)}]},
         "contents": [{"parts": parts}],
         "generationConfig": {
             "response_mime_type": "application/json",
@@ -426,7 +438,7 @@ async def groq_enrich(product: dict, settings: dict) -> Optional[dict]:
 
 # ── Public entry point ─────────────────────────────────────────────────────────
 
-async def ai_enrich(product: dict, settings: dict) -> Optional[dict]:
+async def ai_enrich(product: dict, settings: dict, context_snippet: str | None = None) -> Optional[dict]:
     """
     Enrich a product with AI scoring.
 
@@ -435,12 +447,16 @@ async def ai_enrich(product: dict, settings: dict) -> Optional[dict]:
       2. Groq (text-only)      — free fallback when Gemini is unavailable
       3. Mock (rule-based)     — always works, zero cost
 
+    context_snippet is injected into the Gemini system prompt when the
+    ai_context_injection feature flag is ON and enough decision history exists.
+    Pass None (the default) to preserve the pre-Phase-2 baseline behavior.
+
     Gemini MUST be configured (Settings → gemini_key) for real image analysis.
     Groq is only for metadata-based fallback scoring.
     """
     async with _get_semaphore():
         # 1. Gemini — primary scorer, analyzes actual product images
-        result = await gemini_enrich(product, settings)
+        result = await gemini_enrich(product, settings, context_snippet)
         if result:
             return result
 
@@ -452,10 +468,14 @@ async def ai_enrich(product: dict, settings: dict) -> Optional[dict]:
         # 3. Mock — last resort, always available
         return mock_enrich(product)
 
-async def ai_enrich_batch(products: list[dict], settings: dict) -> list[dict]:
+async def ai_enrich_batch(products: list[dict], settings: dict, context_snippet: str | None = None) -> list[dict]:
     """
     Groups products into a collage and sends to Gemini for batch scoring.
     Saves 80%+ on Vision tokens.
+
+    context_snippet is injected into the Gemini system prompt when the
+    ai_context_injection feature flag is ON and enough decision history exists.
+    Pass None (the default) to preserve the pre-Phase-2 baseline behavior.
     """
     if not products:
         return []
@@ -483,7 +503,7 @@ async def ai_enrich_batch(products: list[dict], settings: dict) -> list[dict]:
     ])
 
     payload = {
-        "system_instruction": {"parts": [{"text": _GEMINI_SYSTEM}]},
+        "system_instruction": {"parts": [{"text": _build_system_text(context_snippet)}]},
         "contents": [{
             "parts": [
                 {"inline_data": {"mime_type": "image/jpeg", "data": b64_collage}},

@@ -985,6 +985,53 @@ async def get_injection_log(limit: int = 50):
     return {"log": rows, "count": len(rows)}
 
 
+async def _build_chat_context() -> dict:
+    """Gather full pipeline context for the AI assistant, using parallel DB queries."""
+    (
+        stats,
+        analytics,
+        recent_jobs,
+        rejected_sample,
+        approved_sample,
+        pending_sample,
+        recommendations,
+    ) = await asyncio.gather(
+        db.get_stats(),
+        db.get_analytics(),
+        db.get_jobs(limit=5),
+        db.get_rejected_sample(limit=30),
+        db.get_products_compact("REVIEWED", limit=20),
+        db.get_products_compact("ENRICHED", limit=30),
+        db.get_recommendations(),
+    )
+    return {
+        "stats": stats,
+        "analytics_summary": {
+            "top_categories": analytics["categories"][:5],
+            "top_rejection_reasons": analytics["top_rejections"][:6],
+            "keyword_performance": analytics["keywords"][:8],
+            "score_distribution": analytics["score_distribution"],
+        },
+        "recent_jobs": [
+            {
+                "id": j["id"],
+                "status": j.get("status"),
+                "keywords": j.get("keywords"),
+                "scraped": j.get("scraped", 0),
+                "created_at": str(j.get("created_at", ""))[:16],
+            }
+            for j in recent_jobs[:3]
+        ],
+        "rejected_sample": rejected_sample,
+        "approved_sample": approved_sample,
+        "pending_sample": pending_sample,
+        "active_recommendations": [
+            {"id": r["id"], "headline": r["headline"], "type": r.get("analysis_type")}
+            for r in recommendations[:5]
+        ],
+    }
+
+
 class ChatRequest(BaseModel):
     message: str
     reconsider: Optional[bool] = False
@@ -994,7 +1041,7 @@ class ChatRequest(BaseModel):
 @app.post("/api/ai/chat")
 async def ai_chat(body: ChatRequest):
     settings = await _settings()
-    context = {"stats": await db.get_stats()}
+    context = await _build_chat_context()
     return await ai_assistant.chat(body.message, context, settings)
 
 # ── Instagram ─────────────────────────────────────────────────────────────────

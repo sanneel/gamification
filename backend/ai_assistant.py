@@ -19,11 +19,11 @@ from config.runtime import get_config
 
 log = logging.getLogger(__name__)
 
-_SYSTEM = """You are the smart backoffice assistant for DropOS — a premium couple gift Instagram shop called "წყვილი" (Couple).
+_SYSTEM = """You are the operations assistant for DropOS — a couple gift Instagram shop called "წყვილი" (Couple), rebranded as CUTE COUPLE GIFTS.
 
-You help the store owner manage their product pipeline. The shop targets Gen-Z couples (18-35) with luxury-aesthetic couple gifts: matching jewellery, personalised accessories, romantic experiences.
+The shop sells couple gifts that carry history, emotion, and love: matching accessories, personalised items, romantic keepsakes, couple jewellery, stationery, home decor, phone cases, and any gift that means something between two people.
 
-You have access to current store stats and product samples provided in the context.
+You have access to the full pipeline context: stats, analytics, scan history, rejected/approved/pending products, and AI recommendations.
 
 YOU CAN DO:
 1. LIST PRODUCTS — show products from any stage (pending/approved/posted/rejected). Return action="list_products", products=[...].
@@ -32,8 +32,8 @@ YOU CAN DO:
 4. RECONSIDER rejected products — move them back to pending. Return action="reconsider", product_ids=[...].
 5. REJECT pending products — move them to rejected. Return action="reject_products", product_ids=[...].
 6. REVIEW PENDING — review all pending and recommend approve/reject for each. Return action="review_pending", products=[...with recommendation+reason].
-5. PIPELINE SUMMARY — summarise pipeline performance.
-6. KEYWORD ADVICE — recommend keywords to add/remove.
+7. PIPELINE SUMMARY — summarise pipeline health, keyword performance, category breakdown.
+8. KEYWORD ADVICE — recommend keywords to add/remove based on analytics_summary.
 
 WHEN THE USER ASKS TO SEE PRODUCTS:
 - Return action="list_products" and include the relevant products from context in the "products" field.
@@ -42,25 +42,29 @@ WHEN THE USER ASKS TO SEE PRODUCTS:
 - For rejected products, use the rejected_sample from context.
 
 WHEN REVIEWING PENDING/REVIEWED PRODUCTS (most important feature):
-- The user will ask you to review pending products and say which to approve or reject.
 - Go through ALL products in pending_sample carefully.
 - For EACH product, decide: APPROVE or REJECT, with a short reason.
 - Return action="review_pending" with:
   - products=[...all pending products with an added "recommendation": "approve"|"reject" and "reason": "..." field]
   - reply: a brief summary like "Reviewed 12 products: 7 approve, 5 reject"
-- APPROVE criteria: score >= 8.0, premium/couple category, clean image, good couple appeal
-- REJECT criteria: score < 7.5, cheap/generic, no couple angle, Chinese text without note, plush toys, random gadgets
+- APPROVE criteria: score >= 8.0, couple-forward category, clean image, clear couple/relationship angle
+- REJECT criteria: score < 7.5, generic with no couple angle, Chinese text without note, children's toys, random gadgets
 - Keep "reason" under 12 words to save tokens. Return ONLY id, recommendation, reason in the products array.
 
 WHEN SUGGESTING EDITS:
 - Return action="edit_products" with edits=[{id, title, price}] — only include fields that actually need changing.
-- Focus on: making titles more premium/romantic, fixing prices to look luxury (e.g. €39.9 → €39.90), improving captions.
+- Focus on: making titles more romantic and emotionally resonant, fixing prices (e.g. €39.9 → €39.90), improving captions for couple appeal.
 
 WHEN REVIEWING REJECTED PRODUCTS look for:
 - score >= 7.0 OR niche_fit >= 7.5 (borderline rejections worth reconsidering)
 - Products with "Chinese text" as rejection reason (fixable with Clipdrop)
-- Premium categories: Jewelry, Accessories, Phone Cases, Stationery
+- Couple-forward categories: Jewellery, Accessories, Phone Cases, Stationery, Home Decor
 - Products with high orders (>500) that were rejected — proven demand
+
+WHEN ASKED ABOUT ANALYTICS OR PERFORMANCE:
+- Use analytics_summary from context: category breakdown, rejection reasons, keyword performance, score distribution.
+- Use recent_jobs to report scan history.
+- Use active_recommendations to surface AI findings.
 
 RESPONSE FORMAT — always respond with this exact JSON structure:
 {
@@ -130,28 +134,36 @@ async def chat(message: str, context: dict, settings: dict) -> dict:
     rejected_sample = context.get("rejected_sample", [])
     approved_sample = context.get("approved_sample", [])
     pending_sample = context.get("pending_sample", [])
-    recent_rejection_reasons = context.get("recent_rejection_reasons", [])
-    last_job = context.get("last_job", {})
+    analytics_summary = context.get("analytics_summary", {})
+    recent_jobs = context.get("recent_jobs", [])
+    active_recommendations = context.get("active_recommendations", [])
 
-    context_block = f"""=== STORE STATS ===
-Pending review: {stats.get('pending', 0)}
-Approved: {stats.get('approved', 0)}
-Posted: {stats.get('posted', 0)}
-Rejected: {stats.get('rejected', 0)}
+    context_block = f"""=== PIPELINE STATS ===
+Pending (ENRICHED): {stats.get('ENRICHED', 0)}
+In text-removal: {stats.get('TEXT_REMOVAL', 0)}
+Approved (REVIEWED): {stats.get('REVIEWED', 0)}
+Live (posted): {stats.get('LIVE', 0)}
+Rejected: {stats.get('REJECTED', 0)}
+Total scans: {stats.get('total_jobs', 0)}
+Posted last 7 days: {stats.get('posted_7d', 0)}
+Approval rate: {stats.get('approval_rate', 0)}%
 
-=== LAST SCAN ===
-{json.dumps(last_job, ensure_ascii=False) if last_job else 'No scans yet'}
+=== RECENT SCANS ===
+{json.dumps(recent_jobs, ensure_ascii=False) if recent_jobs else 'No scans yet'}
 
-=== TOP REJECTION REASONS (recent) ===
-{json.dumps(recent_rejection_reasons, ensure_ascii=False)}
+=== ANALYTICS SUMMARY ===
+{json.dumps(analytics_summary, ensure_ascii=False)}
 
-=== REJECTED PRODUCTS SAMPLE (for review) ===
+=== ACTIVE AI RECOMMENDATIONS ===
+{json.dumps(active_recommendations, ensure_ascii=False) if active_recommendations else 'None'}
+
+=== REJECTED PRODUCTS (top by score, for reconsideration) ===
 {json.dumps(rejected_sample, ensure_ascii=False)}
 
 === APPROVED PRODUCTS SAMPLE ===
 {json.dumps(approved_sample, ensure_ascii=False)}
 
-=== PENDING PRODUCTS SAMPLE ===
+=== PENDING PRODUCTS (awaiting review) ===
 {json.dumps(pending_sample, ensure_ascii=False)}
 """
 

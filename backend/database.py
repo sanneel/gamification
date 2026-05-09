@@ -704,26 +704,32 @@ class Database:
         rows = await self.fetch("""
             SELECT id, title_translated, product_name, category, score, niche_fit,
                    visual_appeal, keyword, sell_price_eur, margin_pct, orders,
-                   rejection_reason, stage
+                   rejection_reason, stage, images_json
             FROM products WHERE stage=$1 ORDER BY score DESC NULLS LAST LIMIT $2
         """, stage, limit)
-        return [
-            {
+        result = []
+        for r in rows:
+            try:
+                images = json.loads(r["images_json"] or "[]")
+            except Exception:
+                images = []
+            result.append({
                 "id": r["id"],
-                "title": (r["title_translated"] or r["product_name"] or "")[:60],
+                "title_translated": (r["title_translated"] or r["product_name"] or "")[:60],
+                "product_name": (r["product_name"] or "")[:60],
                 "category": r["category"],
                 "score": float(r["score"] or 0),
                 "niche_fit": float(r["niche_fit"] or 0),
                 "visual_appeal": float(r["visual_appeal"] or 0),
                 "keyword": r["keyword"],
-                "price": float(r["sell_price_eur"] or 0),
-                "margin": float(r["margin_pct"] or 0),
+                "sell_price_eur": float(r["sell_price_eur"] or 0),
+                "margin_pct": float(r["margin_pct"] or 0),
                 "orders": r["orders"],
                 "rejection_reason": r["rejection_reason"],
                 "stage": r["stage"],
-            }
-            for r in rows
-        ]
+                "image_url": images[0] if images else "",
+            })
+        return result
 
     async def get_stats(self) -> dict:
         stats: dict = {}

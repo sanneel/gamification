@@ -2998,14 +2998,14 @@ function renderChatMessages() {
 
 function renderChatProductCard(p) {
   const img = p.image_url || p.images?.[0] || '';
-  const title = p.title_translated || p.product_name || 'Product';
-  const price = p.sell_price_eur ? `€${Number(p.sell_price_eur).toFixed(2)}` : '';
+  const title = p.title_translated || p.product_name || p.title || 'Product';
+  const price = (p.sell_price_eur || p.price) ? `€${Number(p.sell_price_eur || p.price).toFixed(2)}` : '';
   const score = p.score ? `${p.score}` : '';
   const niche = p.niche_fit ? `nf:${p.niche_fit}` : '';
   const stage = p.stage || '';
   const rec = p.recommendation || '';
   const reason = p.reason || '';
-  const stageColor = {approved:'#22c55e',pending:'#f59e0b',rejected:'#ef4444',posted:'#3b82f6'}[stage]||'#888';
+  const stageColor = {REVIEWED:'#22c55e',ENRICHED:'#f59e0b',REJECTED:'#ef4444',LIVE:'#3b82f6'}[stage]||'#888';
   const recBadge = rec === 'approve'
     ? `<span class="chat-rec approve">✅ Approve</span>`
     : rec === 'reject'
@@ -3014,12 +3014,13 @@ function renderChatProductCard(p) {
   const imgEl = img
     ? `<img src="${API.replace('/api','')}/api/image?url=${encodeURIComponent(img)}" onerror="this.style.display='none'" loading="lazy">`
     : `<div class="chat-card-no-img">📦</div>`;
-  const actionBtns = p.id && stage === 'ENRICHED' ? `
+  const actionBtns = p.id && (stage === 'ENRICHED' || stage === 'SCRAPED') ? `
     <div class="chat-card-actions">
-      <button class="chat-card-approve-btn" onclick="chatQuickApprove(${p.id}, this)">✅ Approve</button>
-      <button class="chat-card-reject-btn" onclick="chatQuickReject(${p.id}, this)">❌ Reject</button>
+      <button class="chat-card-approve-btn" onclick="event.stopPropagation();chatQuickApprove(${p.id}, this)">✅ Approve</button>
+      <button class="chat-card-reject-btn" onclick="event.stopPropagation();chatQuickReject(${p.id}, this)">❌ Reject</button>
     </div>` : '';
-  return `<div class="chat-product-card${rec ? ' rec-'+rec : ''}">
+  const clickable = p.id ? `onclick="showDetail(${p.id})" style="cursor:pointer"` : '';
+  return `<div class="chat-product-card${rec ? ' rec-'+rec : ''}" ${clickable}>
     <div class="chat-card-img">${imgEl}</div>
     <div class="chat-card-info">
       ${recBadge}

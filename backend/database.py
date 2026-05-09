@@ -35,6 +35,13 @@ class Database:
         async with self._pool.acquire() as conn:
             return await conn.fetchval(query, *args)
 
+    async def truncate_product_data(self):
+        """DANGER: Erases all products, raw items, jobs, and logs."""
+        tables = ["products", "products_raw", "pipeline_products", "jobs", "post_log"]
+        for table in tables:
+            await self.execute(f"TRUNCATE TABLE {table} CASCADE;")
+        log.warning("Database: ALL PRODUCT DATA TRUNCATED.")
+
     async def connect(self):
         db_url = os.getenv("DATABASE_URL")
         if not db_url:

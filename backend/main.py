@@ -653,6 +653,16 @@ async def update_settings(body: SettingsUpdate):
         log.error("Failed to update settings: %s", e)
         raise HTTPException(500, detail=str(e))
 
+@app.post("/api/admin/reset-database")
+async def reset_database():
+    """DANGER: Erases all product data from the database."""
+    try:
+        await db.truncate_product_data()
+        return {"ok": True, "message": "Database reset successfully."}
+    except Exception as e:
+        log.error("Database reset failed: %s", e)
+        raise HTTPException(500, detail=f"Reset failed: {str(e)}")
+
 @app.get("/api/stats")
 async def get_stats():
     return await db.get_stats()

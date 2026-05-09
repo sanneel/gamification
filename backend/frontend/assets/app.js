@@ -1634,6 +1634,12 @@ async function renderSettings() {
         </div>
       </div>
 
+      <div class="card" style="border:1px solid var(--red-d)">
+        <div class="card-title" style="color:var(--red)">Danger zone</div>
+        <div style="font-size:11px;color:var(--t3);margin-bottom:12px">Permanently delete all products, jobs, and history. This action cannot be undone.</div>
+        <button class="btn btn-sm btn-danger" onclick="resetDatabase()">Reset database</button>
+      </div>
+
     </div>`;
   setTimeout(loadSchedulerStatus, 150);
   setTimeout(loadReplyLog, 200);
@@ -1723,6 +1729,22 @@ async function loadReplyLog() {
       </div>`
     ).join('');
   } catch { el.textContent = 'Could not load log.'; }
+}
+
+async function resetDatabase() {
+  if (!confirm('Are you absolutely sure? This will delete ALL products, scans, and history from the database. This cannot be undone.')) return;
+  if (!confirm('Final confirmation: You are about to wipe your entire catalog. Continue?')) return;
+  
+  try {
+    const res = await api('/admin/reset-database', 'POST');
+    if (res.ok) {
+      toast('Database reset successfully', 'success');
+      refreshStats();
+      navigate('dashboard');
+    }
+  } catch (e) {
+    toast('Reset failed: ' + e.message, 'error');
+  }
 }
 
 async function detectIgAccount() {

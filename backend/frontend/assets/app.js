@@ -643,9 +643,8 @@ function productCard(p, mode) {
     actions = `<button class="pca-approve" onclick="event.stopPropagation();quickApprove(${p.id})">Approve</button>
                <button class="pca-reject"  onclick="event.stopPropagation();showRejectModal(${p.id})">✕</button>`;
   } else if (mode === 'REVIEWED') {
-    actions = `<button class="pca-post"    onclick="event.stopPropagation();quickPost(${p.id})">Post →</button>
-               <button class="pca-website" onclick="event.stopPropagation();quickPublishWebsite(${p.id})" title="Publish to website">🌐</button>
-               <button class="pca-reject"  onclick="event.stopPropagation();showRejectModal(${p.id})">✕</button>`;
+    actions = `<button class="pca-post"   onclick="event.stopPropagation();quickPost(${p.id})">Post →</button>
+               <button class="pca-reject" onclick="event.stopPropagation();showRejectModal(${p.id})">✕</button>`;
   }
 
   if (mode === 'ENRICHED') {
@@ -732,8 +731,7 @@ function updateSelBar(mode = 'approve') {
   const n = selectedProducts.size;
   let actions = '';
   if (mode === 'post') {
-    actions = `<button class="btn btn-primary" onclick="batchPost()">Post ${n} to Instagram →</button>
-      <button class="btn btn-green" onclick="batchPublishWebsite()">🌐 Website (${n})</button>
+    actions = `<button class="btn btn-primary" onclick="batchPost()">Post ${n} →</button>
       ${n >= 2 && n <= 6 ? `<button class="btn btn-collage" onclick="postCollage([...selectedProducts])">📸 Collage (${n})</button>` : ''}`;
   } else {
     actions = `<button class="btn btn-green" onclick="batchApprove()">Approve ${n}</button>
@@ -1011,8 +1009,7 @@ async function showDetail(id) {
     actionHtml = `<button class="btn btn-green" style="flex:1" onclick="quickApprove(${p.id})">Approve</button>
                   <button class="btn btn-danger" onclick="showRejectModal(${p.id})">Reject</button>`;
   else if (stage === 'REVIEWED')
-    actionHtml = `<button class="btn btn-primary" style="flex:1" onclick="quickPost(${p.id})">Post to Instagram →</button>
-                  <button class="btn btn-green" onclick="quickPublishWebsite(${p.id})">🌐 Website</button>
+    actionHtml = `<button class="btn btn-primary" style="flex:1" onclick="quickPost(${p.id})">Post →</button>
                   <button class="btn btn-danger" onclick="showRejectModal(${p.id})">Reject</button>`;
   else if (stage === 'ENRICHED')
     actionHtml = `<button class="btn btn-green" style="flex:1" id="clean-btn-${p.id}" onclick="cleanImage(${p.id},this)">🧹 Clean image</button>

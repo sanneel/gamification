@@ -60,6 +60,8 @@ from scheduler import create_scheduler, get_scheduler_status
 import instagram
 import sheets
 import ai_assistant
+import decision_memory
+import preference_analyzer
 from utils.google_auth import configure_google_credentials_from_env
 from worker import run_worker_loop, process_queued_items
 
@@ -470,6 +472,7 @@ class SettingsUpdate(BaseModel):
     post_times: Optional[List[str]] = None
     post_timezone: Optional[str] = None
     posts_per_slot: Optional[int] = None
+    ai_context_injection: Optional[bool] = None
 
 # ── Helper Functions ────────────────────────────────────────────────────────
 
@@ -589,7 +592,7 @@ async def _stage_products(product_ids: List[int], stage: str, **kwargs) -> list:
     return changed
 
 def _approval_stage(product: dict) -> str:
-    return ProductStage.ENRICHED.value if product.get("has_chinese_text") else ProductStage.REVIEWED.value
+    return ProductStage.TEXT_REMOVAL.value if product.get("has_chinese_text") else ProductStage.REVIEWED.value
 
 def _items_to_stages(items: list) -> dict:
     stages: dict = {}
@@ -737,7 +740,7 @@ async def proxy_image(url: str):
 @app.post("/api/products/{product_id}/approve")
 async def approve_product(product_id: int):
     p = await _get_product_or_404(product_id)
-    _require_stage(p, ProductStage.SCRAPED.value, "Cannot approve product in stage '{stage}'")
+    _require_stage(p, ProductStage.ENRICHED.value, "Cannot approve product in stage '{stage}'")
     stage = _approval_stage(p)
     await db.set_stage(product_id, stage)
     await _backup_products_to_sheets()
@@ -747,7 +750,7 @@ async def approve_product(product_id: int):
 async def publish_to_website(product_id: int):
     """Publish a product directly to the website catalog (sets LIVE, no Instagram posting)."""
     p = await _get_product_or_404(product_id)
-    if p.get("stage") not in (ProductStage.REVIEWED.value, ProductStage.ENRICHED.value):
+    if p.get("stage") != ProductStage.REVIEWED.value:
         raise HTTPException(400, f"Product must be in REVIEWED stage to publish to website (current: {p.get('stage')})")
     await db.set_stage(product_id, ProductStage.LIVE.value)
     await _backup_products_to_sheets()
@@ -759,13 +762,13 @@ async def approve_products(body: ApproveRequest):
     text_edit = 0
     for pid in body.product_ids[:50]:
         p = await db.get_product(pid)
-        if p and p.get("stage") == ProductStage.SCRAPED.value:
+        if p and p.get("stage") == ProductStage.ENRICHED.value:
             stage = _approval_stage(p)
             await db.set_stage(pid, stage)
-            if stage == ProductStage.ENRICHED.value: text_edit += 1
+            if stage == ProductStage.TEXT_REMOVAL.value: text_edit += 1
             else: approved += 1
     await _backup_products_to_sheets()
-    return {"ok": True, "approved": approved, "text_edit": text_edit}
+    return {"ok": True, "TEXT_REMOVAL": text_edit, "REVIEWED": approved}
 
 @app.post("/api/reject")
 async def reject_products_batch(body: BatchRejectRequest):
@@ -796,7 +799,7 @@ async def reject_product_single(product_id: int, body: RejectRequest = None):
 
 @app.post("/api/products/{product_id}/reconsider")
 async def reconsider_product(product_id: int):
-    await db.set_stage(product_id, ProductStage.SCRAPED.value)
+    await db.set_stage(product_id, ProductStage.ENRICHED.value)
     await _backup_products_to_sheets()
     return {"ok": True}
 
@@ -910,6 +913,77 @@ async def get_analytics():
     data = await db.get_analytics()
     data["stats"] = await db.get_stats()
     return data
+
+# ── Decision Intelligence (read-only, no AI calls) ───────────────────────────
+
+@app.get("/api/ai/decision-stats")
+async def get_decision_stats():
+    """
+    Returns raw decision-history statistics aggregated from the products and
+    pipeline_products tables.  No AI calls; fast and safe to poll.
+    """
+    return await decision_memory.build_summary(db)
+
+
+@app.post("/api/ai/analyze")
+async def analyze_decisions():
+    """
+    Runs the deterministic preference analyzer over the current decision history,
+    stores findings in ai_recommendations, and returns them.
+    Previous non-dismissed recommendations are cleared first so results stay fresh.
+    """
+    settings = await _settings()
+    summary = await decision_memory.build_summary(db)
+    findings, status = preference_analyzer.analyze(summary, settings)
+
+    await db.clear_active_recommendations()
+    for f in findings:
+        await db.save_recommendation(f)
+
+    return {"findings": findings, "count": len(findings), "status": status}
+
+
+@app.get("/api/ai/recommendations")
+async def get_recommendations(include_dismissed: bool = False):
+    """Returns stored AI recommendations, newest first."""
+    recs = await db.get_recommendations(include_dismissed=include_dismissed)
+    return {"recommendations": recs, "count": len(recs)}
+
+
+@app.post("/api/ai/recommendations/{rec_id}/dismiss")
+async def dismiss_recommendation(rec_id: int):
+    """Mark a recommendation as dismissed so it is hidden from the default view."""
+    await db.dismiss_recommendation(rec_id)
+    return {"ok": True}
+
+
+@app.get("/api/ai/injection-stats")
+async def get_injection_stats():
+    """
+    Aggregate comparison of enrichment batches scored with context injection ON
+    vs OFF.  Use this to evaluate whether enabling ai_context_injection changes
+    acceptance rates or score distributions.
+
+    Groups:
+      with_injection    — batches where snippet_injected=1 (flag ON, history sufficient)
+      without_injection — all other batches (flag OFF, insufficient history, or error)
+      by_skip_reason    — full breakdown including flag_off / insufficient_history / error
+    """
+    return await db.get_injection_stats()
+
+
+@app.get("/api/ai/injection-log")
+async def get_injection_log(limit: int = 50):
+    """
+    Recent enrichment batch log records, newest first.
+    Each row represents one worker batch: flag state, snippet presence,
+    snippet length, skip reason, batch size, accepted/rejected counts, avg score.
+    """
+    if limit > 200:
+        limit = 200
+    rows = await db.get_injection_log(limit)
+    return {"log": rows, "count": len(rows)}
+
 
 class ChatRequest(BaseModel):
     message: str

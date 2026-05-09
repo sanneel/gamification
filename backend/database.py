@@ -202,12 +202,30 @@ class Database:
              ai_provider=EXCLUDED.ai_provider,
              has_chinese_text=EXCLUDED.has_chinese_text,
              chinese_text_note=EXCLUDED.chinese_text_note,
-             stage=EXCLUDED.stage,
-             rejection_reason=EXCLUDED.rejection_reason,
-             review_note=EXCLUDED.review_note,
-             approved_at=EXCLUDED.approved_at,
-             rejected_at=EXCLUDED.rejected_at,
-             posted_at=EXCLUDED.posted_at
+             stage=CASE
+               WHEN products.stage IN ('REVIEWED','QUEUED','LIVE') THEN products.stage
+               ELSE EXCLUDED.stage
+             END,
+             rejection_reason=CASE
+               WHEN products.stage IN ('REVIEWED','QUEUED','LIVE') THEN products.rejection_reason
+               ELSE EXCLUDED.rejection_reason
+             END,
+             review_note=CASE
+               WHEN products.stage IN ('REVIEWED','QUEUED','LIVE') THEN products.review_note
+               ELSE EXCLUDED.review_note
+             END,
+             approved_at=CASE
+               WHEN products.stage IN ('REVIEWED','QUEUED','LIVE') THEN products.approved_at
+               ELSE EXCLUDED.approved_at
+             END,
+             rejected_at=CASE
+               WHEN products.stage IN ('REVIEWED','QUEUED','LIVE') THEN products.rejected_at
+               ELSE EXCLUDED.rejected_at
+             END,
+             posted_at=CASE
+               WHEN products.stage IN ('REVIEWED','QUEUED','LIVE') THEN products.posted_at
+               ELSE EXCLUDED.posted_at
+             END
         """,
             int(p.get("job_id") or 0),
             p.get("source", ""),
@@ -683,7 +701,7 @@ class Database:
 
     async def get_stats(self) -> dict:
         stats: dict = {}
-        for stage in ("SCRAPED", "REVIEWED", "ENRICHED", "LIVE", "REJECTED"):
+        for stage in ("SCRAPED", "ENRICHED", "TEXT_REMOVAL", "REVIEWED", "LIVE", "REJECTED"):
             val = await self.fetchval("SELECT COUNT(*) FROM products WHERE stage=$1", stage)
             stats[stage] = val if val else 0
 
@@ -709,6 +727,154 @@ class Database:
     async def get_admin_user(self, email: str) -> Optional[dict]:
         row = await self.fetchrow("SELECT * FROM admin_users WHERE email=$1", email.strip().lower())
         return dict(row) if row else None
+
+    # ── AI Recommendations ────────────────────────────────────────────────────
+
+    async def clear_active_recommendations(self) -> None:
+        """Remove non-dismissed, non-applied recommendations before re-analysis."""
+        await self.execute(
+            "DELETE FROM ai_recommendations WHERE dismissed = 0 AND applied = 0"
+        )
+
+    async def save_recommendation(self, finding: dict) -> int:
+        # asyncpg requires JSONB values to be passed as a JSON string; the driver
+        # handles the cast to jsonb on the server side.
+        row = await self.fetchrow("""
+            INSERT INTO ai_recommendations (generated_at, analysis_type, headline, payload)
+            VALUES ($1, $2, $3, $4::jsonb)
+            RETURNING id
+        """, _now(), finding["type"], finding["headline"], json.dumps(finding))
+        return row["id"]
+
+    async def get_recommendations(self, include_dismissed: bool = False) -> list:
+        if include_dismissed:
+            rows = await self.fetch(
+                "SELECT * FROM ai_recommendations ORDER BY id DESC"
+            )
+        else:
+            rows = await self.fetch(
+                "SELECT * FROM ai_recommendations WHERE dismissed = 0 ORDER BY id DESC"
+            )
+        # asyncpg decodes JSONB columns automatically into dicts; no json.loads needed.
+        return [dict(r) for r in rows]
+
+    async def dismiss_recommendation(self, rec_id: int) -> None:
+        await self.execute(
+            "UPDATE ai_recommendations SET dismissed = 1 WHERE id = $1", rec_id
+        )
+
+    # ── Enrichment observability log ──────────────────────────────────────────
+
+    async def log_enrichment_batch(self, record: dict) -> None:
+        """
+        Write one row to enrichment_log after a worker batch completes.
+        Fire-and-forget — callers must wrap this in try/except.
+        """
+        await self.execute("""
+            INSERT INTO enrichment_log
+                (ts, flag_on, snippet_injected, snippet_length,
+                 skip_reason, batch_size, accepted_count, rejected_count, avg_score)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        """,
+            _now(),
+            int(record.get("flag_on", 0)),
+            int(record.get("snippet_injected", 0)),
+            int(record.get("snippet_length", 0)),
+            record.get("skip_reason"),          # TEXT or None
+            int(record.get("batch_size", 0)),
+            int(record.get("accepted_count", 0)),
+            int(record.get("rejected_count", 0)),
+            record.get("avg_score"),            # DOUBLE PRECISION or None
+        )
+
+    async def get_injection_stats(self) -> dict:
+        """
+        Aggregate comparison of batches scored with injection ON (snippet_injected=1)
+        versus OFF (snippet_injected=0), plus a breakdown by skip_reason.
+        """
+        by_injected = await self.fetch("""
+            SELECT
+                snippet_injected,
+                COUNT(*)                                                    AS batches,
+                COALESCE(SUM(batch_size), 0)                               AS total_products,
+                COALESCE(SUM(accepted_count), 0)                           AS accepted,
+                COALESCE(SUM(rejected_count), 0)                           AS rejected,
+                ROUND(
+                    COALESCE(SUM(accepted_count), 0)::numeric
+                    / NULLIF(SUM(batch_size), 0) * 100, 1
+                )                                                           AS acceptance_rate,
+                ROUND(AVG(avg_score)::numeric, 2)                          AS avg_score
+            FROM enrichment_log
+            GROUP BY snippet_injected
+            ORDER BY snippet_injected
+        """)
+
+        by_reason = await self.fetch("""
+            SELECT
+                flag_on,
+                snippet_injected,
+                COALESCE(skip_reason, 'injected')                          AS skip_reason,
+                COUNT(*)                                                    AS batches,
+                COALESCE(SUM(batch_size), 0)                               AS total_products,
+                COALESCE(SUM(accepted_count), 0)                           AS accepted,
+                ROUND(
+                    COALESCE(SUM(accepted_count), 0)::numeric
+                    / NULLIF(SUM(batch_size), 0) * 100, 1
+                )                                                           AS acceptance_rate,
+                ROUND(AVG(avg_score)::numeric, 2)                          AS avg_score
+            FROM enrichment_log
+            GROUP BY flag_on, snippet_injected, skip_reason
+            ORDER BY flag_on, snippet_injected
+        """)
+
+        totals = await self.fetchrow(
+            "SELECT COUNT(*) AS batches, COALESCE(SUM(batch_size), 0) AS products FROM enrichment_log"
+        )
+
+        def _row(r: dict) -> dict:
+            return {
+                "batches":         r["batches"],
+                "total_products":  r["total_products"],
+                "accepted":        r["accepted"],
+                "rejected":        r["rejected"],
+                "acceptance_rate": float(r["acceptance_rate"]) if r["acceptance_rate"] is not None else None,
+                "avg_score":       float(r["avg_score"]) if r["avg_score"] is not None else None,
+            }
+
+        injected_map = {r["snippet_injected"]: r for r in by_injected}
+        on_row  = injected_map.get(1)
+        off_row = injected_map.get(0)
+
+        return {
+            "total_batches":   int(totals["batches"]),
+            "total_products":  int(totals["products"]),
+            "with_injection":  _row(dict(on_row))  if on_row  else None,
+            "without_injection": _row(dict(off_row)) if off_row else None,
+            "by_skip_reason": [
+                {
+                    "flag_on":          r["flag_on"],
+                    "snippet_injected": r["snippet_injected"],
+                    "skip_reason":      r["skip_reason"],
+                    "batches":          r["batches"],
+                    "total_products":   r["total_products"],
+                    "accepted":         r["accepted"],
+                    "acceptance_rate":  float(r["acceptance_rate"]) if r["acceptance_rate"] is not None else None,
+                    "avg_score":        float(r["avg_score"]) if r["avg_score"] is not None else None,
+                }
+                for r in by_reason
+            ],
+        }
+
+    async def get_injection_log(self, limit: int = 50) -> list:
+        """Recent enrichment batch records, newest first."""
+        rows = await self.fetch("""
+            SELECT id, ts, flag_on, snippet_injected, snippet_length,
+                   skip_reason, batch_size, accepted_count, rejected_count, avg_score
+            FROM enrichment_log
+            ORDER BY id DESC
+            LIMIT $1
+        """, limit)
+        return [dict(r) for r in rows]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -911,6 +1077,54 @@ async def init_db():
                 )
             """)
 
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS ai_recommendations (
+                    id             SERIAL PRIMARY KEY,
+                    generated_at   TEXT NOT NULL,
+                    analysis_type  TEXT NOT NULL,
+                    headline       TEXT NOT NULL,
+                    payload        JSONB NOT NULL,
+                    applied        INTEGER DEFAULT 0,
+                    dismissed      INTEGER DEFAULT 0
+                )
+            """)
+            await conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ai_rec_dismissed ON ai_recommendations(dismissed)"
+            )
+            await conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ai_rec_type ON ai_recommendations(analysis_type)"
+            )
+            # Migration: convert existing TEXT payload column to JSONB if it exists as TEXT.
+            # Safe no-op if the column is already JSONB or the table was just created.
+            try:
+                await conn.execute("""
+                    ALTER TABLE ai_recommendations
+                    ALTER COLUMN payload TYPE JSONB USING payload::jsonb
+                """)
+            except Exception:
+                pass  # Already JSONB or table just created — either way correct
+
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS enrichment_log (
+                    id               SERIAL PRIMARY KEY,
+                    ts               TEXT NOT NULL,
+                    flag_on          INTEGER NOT NULL DEFAULT 0,
+                    snippet_injected INTEGER NOT NULL DEFAULT 0,
+                    snippet_length   INTEGER NOT NULL DEFAULT 0,
+                    skip_reason      TEXT,
+                    batch_size       INTEGER NOT NULL DEFAULT 0,
+                    accepted_count   INTEGER NOT NULL DEFAULT 0,
+                    rejected_count   INTEGER NOT NULL DEFAULT 0,
+                    avg_score        DOUBLE PRECISION
+                )
+            """)
+            await conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_enr_log_ts ON enrichment_log(ts)"
+            )
+            await conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_enr_log_injected ON enrichment_log(snippet_injected)"
+            )
+
             defaults = {
                 "instagram_auto_reply_enabled": False,
                 "instagram_reply_rules": [],
@@ -945,6 +1159,11 @@ async def init_db():
                 "sell_price_min": 15,
                 "sell_price_max": 80,
                 "example_products": "matching couple bracelets, personalised photo frames, couple card games, romantic candle sets, love letter boxes, matching phone cases",
+                # Phase 2 — decision-memory context injection (default OFF)
+                # When true, a compact aggregate summary of past accepted/rejected decisions
+                # is appended to the Gemini system prompt at enrichment time.
+                # No behavior change when false — identical to production baseline.
+                "ai_context_injection": False,
             }
             for k, v in defaults.items():
                 val = json.dumps(v) if not isinstance(v, str) else v

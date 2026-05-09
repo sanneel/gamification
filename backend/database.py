@@ -202,12 +202,30 @@ class Database:
              ai_provider=EXCLUDED.ai_provider,
              has_chinese_text=EXCLUDED.has_chinese_text,
              chinese_text_note=EXCLUDED.chinese_text_note,
-             stage=EXCLUDED.stage,
-             rejection_reason=EXCLUDED.rejection_reason,
-             review_note=EXCLUDED.review_note,
-             approved_at=EXCLUDED.approved_at,
-             rejected_at=EXCLUDED.rejected_at,
-             posted_at=EXCLUDED.posted_at
+             stage=CASE
+               WHEN products.stage IN ('REVIEWED','QUEUED','LIVE') THEN products.stage
+               ELSE EXCLUDED.stage
+             END,
+             rejection_reason=CASE
+               WHEN products.stage IN ('REVIEWED','QUEUED','LIVE') THEN products.rejection_reason
+               ELSE EXCLUDED.rejection_reason
+             END,
+             review_note=CASE
+               WHEN products.stage IN ('REVIEWED','QUEUED','LIVE') THEN products.review_note
+               ELSE EXCLUDED.review_note
+             END,
+             approved_at=CASE
+               WHEN products.stage IN ('REVIEWED','QUEUED','LIVE') THEN products.approved_at
+               ELSE EXCLUDED.approved_at
+             END,
+             rejected_at=CASE
+               WHEN products.stage IN ('REVIEWED','QUEUED','LIVE') THEN products.rejected_at
+               ELSE EXCLUDED.rejected_at
+             END,
+             posted_at=CASE
+               WHEN products.stage IN ('REVIEWED','QUEUED','LIVE') THEN products.posted_at
+               ELSE EXCLUDED.posted_at
+             END
         """,
             int(p.get("job_id") or 0),
             p.get("source", ""),

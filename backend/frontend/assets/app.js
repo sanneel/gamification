@@ -2920,13 +2920,13 @@ let chatHistory = [];
 let chatPending = false;
 
 const QUICK_ACTIONS = [
-  { label: 'Generate caption', msg: 'Generate 3 Instagram captions (romantic, playful, luxury tone) for one of my recently approved products.' },
-  { label: "Check today's queue", msg: "Give me a brief summary of the current pipeline status and any recommendations." },
-  { label: 'Show low margin products', msg: 'Which of my products have the lowest margin? List them with prices and suggestions.' },
-  { label: "Summarize this week's sales", msg: "Summarize this week's performance: posts published, pipeline stats, and key recommendations." },
-  { label: '✅ Show approved', msg: 'Show me all currently approved products ready to post.' },
-  { label: '📝 Improve pending titles', msg: 'Look at my pending products and suggest better, more premium English titles for them.' },
-  { label: '✨ Best rejected gems', msg: 'From the rejected products, which 5-10 are the best candidates to reconsider? List them with IDs.' },
+  { label: 'Pipeline status', msg: 'Give me a brief operational summary: pipeline counts, approval rate, top rejection reasons, and any active recommendations.' },
+  { label: 'Review pending', msg: 'Review all my pending products. For each, recommend approve or reject with a short reason.' },
+  { label: 'Show approved', msg: 'Show me all currently approved products ready to post.' },
+  { label: 'Rejected gems', msg: 'From the rejected products, which 5-10 are the strongest candidates to reconsider? Focus on high score and strong couple angle.' },
+  { label: 'Improve titles', msg: 'Look at my pending products and suggest better, more romantic and emotionally resonant English titles.' },
+  { label: 'Keyword performance', msg: 'Which keywords are bringing in the most approved products? Which should I drop or add?' },
+  { label: 'Generate captions', msg: 'Generate 3 Instagram captions (romantic, heartfelt, couple-focused) for one of my recently approved products.' },
 ];
 
 function chatAppend(role, text, meta = {}) {
@@ -3224,36 +3224,52 @@ function _chatAiStatusBanner(settingsData) {
   const hasGemini = settingsData?.gemini_key_set;
   const hasGroq   = settingsData?.groq_key_set;
   if (hasGemini || hasGroq) {
-    const which = hasGemini ? '✦ Gemini active' : '✦ Groq active';
-    return `<div class="chat-status-bar ready">${which} — AI powered</div>`;
+    const which = hasGemini ? 'Gemini' : 'Groq';
+    return `<span class="chat-ai-badge ready">● ${which} connected</span>`;
   }
-  return `<div class="chat-status-bar warn">⚠ No AI key set — <button onclick="navigate('settings')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;padding:0;text-decoration:underline">add Gemini key in Settings</button> for smart reviews</div>`;
+  return `<span class="chat-ai-badge warn">⚠ No AI key — <button onclick="navigate('settings')" style="background:none;border:none;color:inherit;cursor:pointer;font-size:inherit;padding:0;text-decoration:underline">add in Settings</button></span>`;
+}
+
+function _chatContextStrip(s) {
+  if (!s) return '';
+  const pending  = (s.ENRICHED || 0) + (s.TEXT_REMOVAL || 0);
+  const approved = s.REVIEWED || 0;
+  const live     = s.LIVE || 0;
+  const rejected = s.REJECTED || 0;
+  return `<div class="chat-ctx-strip">
+    <span class="ctx-pill ctx-pending">${pending} pending</span>
+    <span class="ctx-pill ctx-approved">${approved} approved</span>
+    <span class="ctx-pill ctx-live">${live} live</span>
+    <span class="ctx-pill ctx-rejected">${rejected} rejected</span>
+  </div>`;
 }
 
 async function renderChat() {
-  setTitle('AI Assistant', 'Chat with your store AI');
+  setTitle('Operations', 'Cute Couple Gifts — AI assistant');
   document.getElementById('topbar-actions').innerHTML = `
-    <button class="btn-sm" onclick="chatHistory=[];renderChatMessages()">Clear chat</button>`;
+    <button class="btn-sm" onclick="chatHistory=[];renderChatMessages()">Clear</button>`;
 
   document.getElementById('content').innerHTML = `
     <div class="chat-page">
-      ${_chatAiStatusBanner(settingsData)}
+      <div class="chat-header-bar">
+        ${_chatContextStrip(stats)}
+        ${_chatAiStatusBanner(settingsData)}
+      </div>
       <div class="chat-quick-row">
         ${QUICK_ACTIONS.map(a => `<button class="chat-quick-btn" data-msg="${a.msg.replace(/"/g,'&quot;')}" onclick="chatSend(this.dataset.msg)">${a.label}</button>`).join('')}
       </div>
       <div class="chat-messages" id="chat-messages"></div>
       <div class="chat-input-row">
-        <textarea class="chat-input" id="chat-input" placeholder="Ask anything about your store, or say 'find me rejected gems'…" rows="2"
+        <textarea class="chat-input" id="chat-input" placeholder="Ask anything — review queue, keyword performance, rejected gems, caption ideas…" rows="2"
           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();chatSend(this.value)}"></textarea>
-        <button class="chat-send-btn" id="chat-send-btn" onclick="chatSend(document.getElementById('chat-input').value)">Send</button>
+        <button class="chat-send-btn" id="chat-send-btn" onclick="chatSend(document.getElementById('chat-input').value)">↑</button>
       </div>
     </div>`;
 
   renderChatMessages();
 
-  // Welcome message on first open
   if (chatHistory.length === 0) {
-    chatAppend('assistant', 'Hey! 👋 I\'m your store AI. I can review rejected products and find hidden gems, summarise your pipeline, or give keyword advice. What do you need?');
+    chatAppend('assistant', 'Welcome to Cute Couple Gifts operations. I have full access to your pipeline — pending products, approvals, rejections, scan history, keyword analytics, and AI recommendations.\n\nAsk me to review the queue, surface rejected gems, suggest title improvements, or summarise performance. What do you need?');
   }
 }
 

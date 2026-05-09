@@ -424,6 +424,7 @@ class ProductUpdate(BaseModel):
     url: Optional[str] = None
     has_chinese_text: Optional[bool] = None
     chinese_text_note: Optional[str] = None
+    instagram_url: Optional[str] = None
 
 class SettingsUpdate(BaseModel):
     niche: Optional[str] = None
@@ -1037,8 +1038,14 @@ async def _post_and_export(products: list) -> None:
         results = await instagram.post_batch(products, settings)
         for p in products:
             res = next((r for r in results if r.product_id == p["id"]), None)
-            if res and res.status == "error":
-                log.warning("Instagram post failed for product %s: %s", p["id"], res.error)
+            if res:
+                if res.status == "error":
+                    log.warning("Instagram post failed for product %s: %s", p["id"], res.error)
+                elif res.status in ("posted", "mock") and res.post_url:
+                    p["instagram_url"] = res.post_url  # Update local object for sheets export
+                    await db.update_product_fields(p["id"], {"instagram_url": res.post_url})
+                    log.info("Saved Instagram URL for product %s: %s", p["id"], res.post_url)
+        
         await asyncio.to_thread(sheets.append_rows, products)
         await _backup_products_to_sheets()
     except Exception as e:

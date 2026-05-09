@@ -293,6 +293,7 @@ class Database:
             "stage",
             "rejection_reason",
             "audience",
+            "instagram_url",
         }
         updates = {k: v for k, v in (data or {}).items() if k in allowed}
         if "sell_price_eur" in updates:

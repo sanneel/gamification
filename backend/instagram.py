@@ -99,7 +99,10 @@ async def _create_container(
     )
     body = resp.json()
     if "error" in body:
-        raise RuntimeError(body["error"].get("message", str(body["error"])))
+        err = body["error"]
+        log.error("Instagram container error: code=%s subcode=%s msg=%s",
+                  err.get("code"), err.get("error_subcode"), err.get("message"))
+        raise RuntimeError(err.get("message", str(err)))
     return body["id"]
 
 

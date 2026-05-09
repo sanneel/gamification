@@ -88,7 +88,7 @@ async def process_scraped_products(job_id: int, raw_all: list, settings: Optiona
     for p in raw_all:
         if p.get("source_id") not in filtered_ids:
             p["stage"] = "REJECTED"
-            p["rejection_reason"] = "Bouncer: spam/no-image/low-orders"
+            p["rejection_reason"] = p.pop("_bouncer_reason", "Bouncer: spam/no-image/low-orders")
             await db.insert_product(p, job_id)
 
     # ── 4. Profit filter (adds cost/sell/margin fields) ────────────────────────

@@ -46,27 +46,28 @@ def profit_filter(product: dict, settings: dict) -> bool:
 
     return margin >= min_margin_req
 
+# B2B / bulk-manufacturing signals — "custom print" removed because retail
+# couple gift products (matching hoodies, phone cases) legitimately use it.
 _SPAM_FRAGMENTS = [
     "oem", "bulk order", "custom logo", "1000pcs",
-    "minimum order", "custom print", "private label",
+    "minimum order", "private label",
     "wholesale", "factory", "supplier", "reseller",
     "100pcs", "50pcs", "per lot", "lot of",
 ]
 
-# Material-level signals for products that look cheap and off-brand for a
-# premium couple gift shop — caught here before scoring wastes AI tokens.
+# Material-level signals for clearly off-brand products.
 _CHEAP_MATERIAL_FRAGMENTS = [
     "plastic bracelet", "plastic necklace", "plastic ring",
     "rubber bracelet", "rubber keychain",
     "silicone bracelet", "silicone wristband",
-    "acrylic keychain", "acrylic ring", "acrylic necklace",
+    "acrylic ring", "acrylic necklace",
     "resin bracelet", "resin necklace", "resin ring",
     "eva foam", "pvc keychain",
 ]
 
-# Products below this CNY price are almost always low quality.
-# ~€3–4 cost before shipping — genuinely premium items rarely cost less.
-_MIN_PRICE_CNY = 8.0
+# Lowered from 8.0 — stationery and cards (greeting cards, bookmarks) often
+# cost 5–7 CNY with 20k+ orders and are strong couple gift products.
+_MIN_PRICE_CNY = 5.0
 
 
 def basic_filter(products: list, settings: dict) -> list:
@@ -75,6 +76,7 @@ def basic_filter(products: list, settings: dict) -> list:
 
     for p in products:
         if not p.get("title") or not p.get("price_cny"):
+            p["_bouncer_reason"] = "Bouncer: missing title or price"
             continue
 
         platform = p.get("source_platform", "")
@@ -82,38 +84,41 @@ def basic_filter(products: list, settings: dict) -> list:
         if platform == "1688":
             orders = int(p.get("orders") or 0)
             if orders < 5:
+                p["_bouncer_reason"] = f"Bouncer: low orders ({orders})"
                 continue
 
         title_lower = (p.get("title_translated") or p.get("title", "")).lower()
-        if any(frag in title_lower for frag in _SPAM_FRAGMENTS):
+        matched_spam = next((f for f in _SPAM_FRAGMENTS if f in title_lower), None)
+        if matched_spam:
+            p["_bouncer_reason"] = f"Bouncer: spam keyword ({matched_spam!r})"
             continue
 
-        # Reject products that clearly use cheap materials — won't fit premium brand
-        if any(frag in title_lower for frag in _CHEAP_MATERIAL_FRAGMENTS):
+        matched_cheap = next((f for f in _CHEAP_MATERIAL_FRAGMENTS if f in title_lower), None)
+        if matched_cheap:
+            p["_bouncer_reason"] = f"Bouncer: cheap material ({matched_cheap!r})"
             continue
 
-        # Price floor — very cheap items signal poor quality for premium positioning
         price_cny = float(p.get("price_cny", 0))
         if price_cny < _MIN_PRICE_CNY:
+            p["_bouncer_reason"] = f"Bouncer: price too low ({price_cny:.1f} CNY)"
             continue
 
-        # For taobao: apply minimum rating filter (1688 has no reliable rating)
         if platform != "1688":
             min_rating = float(get_config("MIN_RATING", settings.get("min_rating", 4.0)))
             rating = float(p.get("rating") or 0)
             if rating > 0 and rating < min_rating:
+                p["_bouncer_reason"] = f"Bouncer: low rating ({rating})"
                 continue
 
         if not p.get("images"):
+            p["_bouncer_reason"] = "Bouncer: no images"
             continue
 
         # ── Title dedup (works across all keywords since raw_all is combined) ──
-        # Uses first 40 chars — catches same product appearing under multiple keywords
         title_hash = hashlib.md5(title_lower[:40].encode()).hexdigest()
         if title_hash in seen_titles:
             idx = seen_titles[title_hash]
             existing = out[idx]
-            # Keep whichever has more orders; if tied keep lower price
             if (p.get("orders", 0) > existing.get("orders", 0) or
                     (p.get("orders", 0) == existing.get("orders", 0) and
                      p.get("price_cny", 999) < existing.get("price_cny", 999))):

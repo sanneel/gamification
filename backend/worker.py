@@ -118,6 +118,7 @@ async def run_worker_loop():
                     "caption": res.get("caption") or p.get("caption") or "",
                     "hashtags_json": json.dumps(res.get("hashtags") or p.get("hashtags") or []),
                     "product_name": res.get("product_name", p.get("product_name", "")),
+                    "audience": res.get("audience") or "",
                     "stage": ProductStage.ENRICHED.value,
                 }
 

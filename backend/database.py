@@ -285,6 +285,7 @@ class Database:
             "chinese_text_note",
             "stage",
             "rejection_reason",
+            "audience",
         }
         updates = {k: v for k, v in (data or {}).items() if k in allowed}
         if "sell_price_eur" in updates:
@@ -786,6 +787,7 @@ async def init_db():
                     rejected_at       TEXT,
                     posted_at         TEXT,
                     created_at        TEXT,
+                    audience          TEXT DEFAULT '',
                     CHECK (stage IN ('SCRAPED', 'ENRICHED', 'REVIEWED', 'QUEUED', 'LIVE', 'REJECTED'))
                 )
             """)
@@ -796,6 +798,15 @@ async def init_db():
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_products_source_id ON products(source_id)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_products_source_platform ON products(source)")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_products_stage_created ON products(stage, created_at)")
+
+            # ── Migrations for existing DBs ────────────────────────────────
+            for col, definition in [
+                ("audience", "TEXT DEFAULT ''"),
+            ]:
+                try:
+                    await conn.execute(f"ALTER TABLE products ADD COLUMN IF NOT EXISTS {col} {definition}")
+                except Exception:
+                    pass
 
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS jobs (

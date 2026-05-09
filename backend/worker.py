@@ -1,16 +1,7 @@
 """
-Background workers for the DropOS Operations Engine.
-
-IMPORT NOTE: backend/ is NOT a Python package (no top-level __init__.py).
-Uvicorn runs main.py directly, which inserts backend/ into sys.path via
-  sys.path.insert(0, os.path.dirname(__file__))
-All imports here MUST therefore be ABSOLUTE (e.g. `from database import db`)
-rather than relative (e.g. `from .database import db`).  Relative imports
-cause an ImportError at startup and prevent the server from ever binding.
-
-Two independent loops run concurrently via asyncio.create_task():
-  • run_worker_loop        — Vision AI curation + Deep Enrichment (SCRAPED → ENRICHED)
-  • process_queued_items   — Instagram publishing (QUEUED → LIVE)
+Worker Service (DropOS)
+----------------------
+Handles the background processing pipeline for products.
 
 "Blast Shield" pattern: the outermost try/except in each loop catches ALL
 unexpected exceptions. On failure the loop logs the error, sleeps for
@@ -21,8 +12,9 @@ never permanently kill the background process.
 import asyncio
 import logging
 import json
+from datetime import datetime, timezone
 
-# ── Absolute imports (backend/ is on sys.path, NOT a package) ──────────────────
+# ── Absolute imports (backend/ is on sys.path, NOT a package) ─────────────────
 from database import db
 from models import ProductStage          # NOT from main — that causes a circular import
 from services.images import process_image
@@ -33,7 +25,7 @@ log = logging.getLogger(__name__)
 
 # How long to pause after an unexpected crash before retrying
 _ERROR_SLEEP = 60
-# Batch size for Vision AI collage; must match collage.py COLS*ROWS (2×3 = 6)
+# Batch size for Vision AI collage; must match collage.py COLS*ROWS (2A-3 = 6)
 _BATCH_SIZE = 6
 
 
@@ -51,7 +43,7 @@ async def run_worker_loop():
 
     while True:
         try:
-            # ── Poll for SCRAPED products ──────────────────────────────────────
+            # ── Poll for SCRAPED products ─────────────────────────────────────
             products = await db.get_products(
                 stage=ProductStage.SCRAPED.value,
                 limit=_BATCH_SIZE,
@@ -85,16 +77,16 @@ async def run_worker_loop():
                 res = batch_results[i]
 
                 if not res.get("store_match"):
-                    # ── Curator rejection ──────────────────────────────────────
+                    # ── Curator rejection ─────────────────────────────────────
                     reason = res.get("rejection_reason", "Low visual appeal")
                     await db.update_product_fields(pid, {
                         "stage": "REJECTED",
                         "rejection_reason": f"Curator: {reason}",
                     })
-                    log.info("Worker: [REJECT] pid=%d — %s", pid, reason[:80])
+                    log.info("Worker: [REJECT] pid=%d → %s", pid, reason[:80])
                     continue
 
-                # ── Winner: Deep Enrichment + Supabase Image Upload ────────────
+                # ── Winner: Deep Enrichment + Supabase Image Upload ───────────
                 log.info("Worker: [WINNER] Deep Enrichment for pid=%d...", pid)
                 title = p.get("title_translated") or p.get("product_name") or p.get("title") or ""
                 description = p.get("description_translated") or p.get("description") or ""
@@ -139,7 +131,7 @@ async def run_worker_loop():
             log.info("Autonomous worker loop cancelled.")
             break
         except Exception as e:
-            # ── Blast Shield ───────────────────────────────────────────────────
+            # ── Blast Shield ──────────────────────────────────────────────────
             log.error(
                 "Critical Worker Error (will retry in %ds): %s",
                 _ERROR_SLEEP, e, exc_info=True,
@@ -169,15 +161,19 @@ async def process_queued_items():
                 image_url = images[0] if images else p.get("image_url", "")
 
                 caption = p.get("caption", "")
-                hashtags = p.get("hashtags", [])
+                hashtags = p.get("hashtags") or []
                 if hashtags:
                     caption += "\n\n" + " ".join(hashtags)
 
                 log.info("Publisher: Publishing pid=%d...", pid)
                 try:
-                    await publish_to_instagram(image_url, caption)
-                    await db.set_stage(pid, ProductStage.LIVE.value)
-                    log.info("Publisher: pid=%d → LIVE.", pid)
+                    ig_url = await publish_to_instagram(image_url, caption)
+                    await db.update_product_fields(pid, {
+                        "stage": ProductStage.LIVE.value,
+                        "instagram_url": ig_url,
+                        "posted_at": datetime.now(timezone.utc).isoformat()
+                    })
+                    log.info("Publisher: pid=%d → LIVE (URL: %s).", pid, ig_url)
                 except Exception as e:
                     log.error("Publisher: Failed to publish pid=%d: %s", pid, e)
 
@@ -187,7 +183,7 @@ async def process_queued_items():
             log.info("Publisher loop cancelled.")
             break
         except Exception as e:
-            # ── Blast Shield ───────────────────────────────────────────────────
+            # ── Blast Shield ──────────────────────────────────────────────────
             log.error(
                 "Critical Publisher Error (will retry in %ds): %s",
                 _ERROR_SLEEP, e, exc_info=True,

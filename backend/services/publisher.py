@@ -13,13 +13,15 @@ async def publish_to_instagram(image_url: str, caption: str) -> str:
       1. Create a media container.
       2. Poll until container status is FINISHED.
       3. Publish the media container.
+      4. Fetch the permalink.
     """
     ig_access_token = os.getenv("IG_ACCESS_TOKEN")
     ig_account_id = os.getenv("IG_ACCOUNT_ID")
 
     if not ig_access_token or not ig_account_id:
         log.info(f"Mock Publish Success: [image_url={image_url}] [caption={caption[:30]}...]")
-        return f"mock_media_id_{int(datetime.now().timestamp())}"
+        # Return a mock permalink
+        return f"https://www.instagram.com/p/mock_{int(datetime.now().timestamp())}/"
 
     base_url = "https://graph.facebook.com/v22.0"
 
@@ -84,4 +86,17 @@ async def publish_to_instagram(image_url: str, caption: str) -> str:
             
         media_id = publish_data.get("id")
         log.info(f"Successfully published media: {media_id}")
-        return media_id
+
+        # Step 4: Get permalink
+        try:
+            permalink_url = f"{base_url}/{media_id}"
+            permalink_params = {
+                "fields": "permalink",
+                "access_token": ig_access_token
+            }
+            permalink_res = await client.get(permalink_url, params=permalink_params)
+            permalink_data = permalink_res.json()
+            return permalink_data.get("permalink", f"https://www.instagram.com/p/{media_id}/")
+        except Exception as e:
+            log.warning(f"Failed to fetch permalink for {media_id}: {e}")
+            return f"https://www.instagram.com/p/{media_id}/"

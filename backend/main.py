@@ -622,7 +622,9 @@ async def get_catalog(limit: int = 100, offset: int = 0, category: Optional[str]
             "description":       p.get("description") or "",
             "score":             p.get("score") or 0,
             "audience":          p.get("audience") or "",
+            "instagram_url":     p.get("instagram_url") or "",
         })
+
         
     return {
         "products": safe_products,

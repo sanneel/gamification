@@ -795,6 +795,7 @@ async def init_db():
                     posted_at         TEXT,
                     created_at        TEXT,
                     audience          TEXT DEFAULT '',
+                    instagram_url     TEXT DEFAULT '',
                     CHECK (stage IN ('SCRAPED', 'ENRICHED', 'REVIEWED', 'QUEUED', 'LIVE', 'REJECTED'))
                 )
             """)
@@ -809,6 +810,7 @@ async def init_db():
             # ── Migrations for existing DBs ────────────────────────────────
             for col, definition in [
                 ("audience", "TEXT DEFAULT ''"),
+                ("instagram_url", "TEXT DEFAULT ''"),
             ]:
                 try:
                     await conn.execute(f"ALTER TABLE products ADD COLUMN IF NOT EXISTS {col} {definition}")

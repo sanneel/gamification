@@ -472,6 +472,7 @@ class SettingsUpdate(BaseModel):
     post_times: Optional[List[str]] = None
     post_timezone: Optional[str] = None
     posts_per_slot: Optional[int] = None
+    ai_context_injection: Optional[bool] = None
 
 # ── Helper Functions ────────────────────────────────────────────────────────
 

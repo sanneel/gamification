@@ -53,6 +53,7 @@ sys.path.insert(0, BASE_DIR)
 from models import ProductStage
 from config.runtime import get_config, merge_env_with_settings, sanitize_settings
 from image_editor import remove_text as clipdrop_remove_text, _convert_to_jpeg
+from services.images import upload_product_image
 from database import db, init_db
 from runner import process_scraped_products, run_pipeline
 from scheduler import create_scheduler, get_scheduler_status
@@ -792,11 +793,19 @@ async def remove_product_text(product_id: int):
     
     _cleaned_images[product_id] = cleaned
     with open(f"{_COLLAGE_DIR}/cleaned_{product_id}.jpg", "wb") as f: f.write(cleaned)
-    
-    base = str(settings.get("public_base_url") or "").rstrip("/")
-    new_url = f"{base}/api/products/{product_id}/cleaned-image" if base else f"/api/products/{product_id}/cleaned-image"
-    
-    imgs = [new_url] + [img for img in (p.get("images") or []) if img and img != url]
+
+    # Upload to Supabase for persistence across Railway restarts
+    supabase_url = await upload_product_image(cleaned, f"cleaned_{product_id}")
+
+    if supabase_url:
+        new_url = supabase_url
+    else:
+        base = str(settings.get("public_base_url") or "").rstrip("/")
+        new_url = f"{base}/api/products/{product_id}/cleaned-image" if base else f"/api/products/{product_id}/cleaned-image"
+
+    # Keep original CDN URLs as fallback (filter out any prior cleaned-image URLs)
+    original_imgs = [img for img in (p.get("images") or []) if img and "/api/products/" not in img]
+    imgs = [new_url] + original_imgs
     await db.update_product_fields(product_id, {"images_json": json.dumps(imgs), "has_chinese_text": False})
     await db.set_stage(product_id, ProductStage.REVIEWED.value)
     return {"ok": True, "image_url": new_url}
@@ -814,7 +823,7 @@ async def serve_cleaned_image(product_id: int):
     product = await db.get_product(product_id)
     if product:
         fallback = next(
-            (img for img in (product.get("images") or []) if img and "/cleaned-image" not in img),
+            (img for img in (product.get("images") or []) if img and "/api/products/" not in img),
             None,
         )
         if fallback:

@@ -252,7 +252,7 @@ async function renderDashboard() {
     <div class="dash-stat-grid">
       <div class="dash-stat-card">
         <div class="dash-stat-label">Ready to review</div>
-        <div class="dash-stat-val" style="color:var(--blue)">${s.SCRAPED ?? 0}</div>
+        <div class="dash-stat-val" style="color:var(--blue)">${s.ENRICHED ?? 0}</div>
         <div class="dash-stat-actions">
           <button class="dash-stat-btn" onclick="navigate('queue')">Review now</button>
           <button class="dash-stat-btn" onclick="navigate('scan')">Find products</button>
@@ -316,7 +316,7 @@ async function renderDashboard() {
             </div>`).join('')}
         <div style="margin-top:14px;display:flex;gap:8px">
           <button class="btn btn-sm" onclick="navigate('scan')">New scan</button>
-          ${(s.SCRAPED > 0) ? `<button class="btn btn-sm btn-green" onclick="navigate('queue')">Review ${s.SCRAPED} products</button>` : ''}
+          ${(s.ENRICHED > 0) ? `<button class="btn btn-sm btn-green" onclick="navigate('queue')">Review ${s.ENRICHED} products</button>` : ''}
           ${(s.REVIEWED > 0) ? `<button class="btn btn-sm btn-amber" onclick="navigate('REVIEWED')">Post ${s.REVIEWED} approved</button>` : ''}
         </div>
       </div>
@@ -515,7 +515,7 @@ async function renderQueue() {
 async function loadQueue(append = false) {
   const offset = append ? queueProducts.length : 0;
   if (!append) queueProducts = [];
-  const data = await api(`/products?stage=SCRAPED&limit=50&offset=${offset}&sort=${queueSort}`).catch(() => ({ products: [], total: 0 }));
+  const data = await api(`/products?stage=ENRICHED&limit=50&offset=${offset}&sort=${queueSort}`).catch(() => ({ products: [], total: 0 }));
   queueProducts = append ? queueProducts.concat(data.products) : data.products;
   queueTotal = data.total;
   renderQueueGrid();
@@ -602,7 +602,7 @@ async function renderTextEdit() {
 async function loadTextEdit(append = false) {
   const offset = append ? textEditProducts.length : 0;
   if (!append) textEditProducts = [];
-  const data = await api(`/products?stage=ENRICHED&limit=50&offset=${offset}&sort=score`).catch(() => ({ products: [], total: 0 }));
+  const data = await api(`/products?stage=TEXT_REMOVAL&limit=50&offset=${offset}&sort=score`).catch(() => ({ products: [], total: 0 }));
   textEditProducts = append ? textEditProducts.concat(data.products) : data.products;
   textEditTotal = data.total;
   renderTextEditGrid();
@@ -624,7 +624,7 @@ function renderTextEditGrid() {
       <span style="font-size:12px;color:var(--t3)">${textEditTotal} need image text cleanup</span>
     </div>
     <div class="product-grid" id="product-grid">
-      ${textEditProducts.map(p => productCard(p, 'ENRICHED')).join('')}
+      ${textEditProducts.map(p => productCard(p, 'TEXT_REMOVAL')).join('')}
     </div>
     ${canMore ? `<div style="text-align:center;margin-top:20px">
       <button class="btn" onclick="loadTextEdit(true)">Load more (${textEditTotal - textEditProducts.length} remaining)</button>
@@ -647,7 +647,7 @@ function productCard(p, mode) {
                <button class="pca-reject" onclick="event.stopPropagation();showRejectModal(${p.id})">✕</button>`;
   }
 
-  if (mode === 'ENRICHED') {
+  if (mode === 'TEXT_REMOVAL') {
     actions = `<button class="pca-clean" id="clean-btn-${p.id}" onclick="event.stopPropagation();cleanImage(${p.id},this)">🧹 Clean</button>
                <button class="pca-reject" onclick="event.stopPropagation();showRejectModal(${p.id})">Reject</button>`;
   }
@@ -701,7 +701,7 @@ function toggleSel(id) {
   if (card) {
     card.className = `product-card${selectedProducts.has(id) ? ' selected' : ''}`;
   }
-  updateSelBar(currentPage === 'REVIEWED' ? 'post' : currentPage === 'textEdit' ? 'ENRICHED' : 'approve');
+  updateSelBar(currentPage === 'REVIEWED' ? 'post' : currentPage === 'textEdit' ? 'TEXT_REMOVAL' : 'approve');
 }
 
 function selectAll() {
@@ -748,7 +748,7 @@ async function batchApprove() {
   const ids = [...selectedProducts];
   try {
     const res = await api('/approve', 'POST', { product_ids: ids });
-    const textEdit = res.ENRICHED || 0;
+    const textEdit = res.TEXT_REMOVAL || 0;
     const approved = res.REVIEWED || 0;
     toast(textEdit ? `${approved} approved · ${textEdit} moved to Text edit` : `${approved || ids.length} approved`, 'success');
     selectedProducts.clear();
@@ -801,7 +801,7 @@ async function quickApprove(id) {
   _cacheInvalidate('/products', '/stats');
   try {
     const res = await api(`/products/${id}/approve`, 'POST');
-    toast(res.stage === 'ENRICHED' ? 'Moved to Text edit' : 'Approved', 'success');
+    toast(res.stage === 'TEXT_REMOVAL' ? 'Moved to Text edit' : 'Approved', 'success');
     closeDetail();
     queueProducts = queueProducts.filter(p => p.id !== id);
     selectedProducts.delete(id);
@@ -1005,13 +1005,13 @@ async function showDetail(id) {
   const stageLabel = { pending:'Pending', approved:'Approved', text_edit:'Text edit', posted:'Posted', rejected:'Rejected' }[stage] || stage;
 
   let actionHtml = '';
-  if (stage === 'SCRAPED')
+  if (stage === 'ENRICHED')
     actionHtml = `<button class="btn btn-green" style="flex:1" onclick="quickApprove(${p.id})">Approve</button>
                   <button class="btn btn-danger" onclick="showRejectModal(${p.id})">Reject</button>`;
   else if (stage === 'REVIEWED')
     actionHtml = `<button class="btn btn-primary" style="flex:1" onclick="quickPost(${p.id})">Post →</button>
                   <button class="btn btn-danger" onclick="showRejectModal(${p.id})">Reject</button>`;
-  else if (stage === 'ENRICHED')
+  else if (stage === 'TEXT_REMOVAL')
     actionHtml = `<button class="btn btn-green" style="flex:1" id="clean-btn-${p.id}" onclick="cleanImage(${p.id},this)">🧹 Clean image</button>
                   <button class="btn btn-danger" onclick="showRejectModal(${p.id})">Reject</button>`;
   else if (stage === 'REJECTED')
@@ -2143,7 +2143,7 @@ async function renderTools() {
     <div class="stat-row" style="margin-bottom:24px">
       <div class="stat-card blue" style="cursor:pointer" onclick="navigate('queue')">
         <div class="stat-label">Review Queue</div>
-        <div class="stat-val">${s.SCRAPED ?? 0}</div>
+        <div class="stat-val">${s.ENRICHED ?? 0}</div>
         <div class="stat-sub">pending review</div>
       </div>
       <div class="stat-card green" style="cursor:pointer" onclick="navigate('REVIEWED')">
@@ -2177,7 +2177,7 @@ async function renderTools() {
         status: 'ready',
         action: "navigate('queue')",
         actionLabel: 'Review Products',
-        badge: s.SCRAPED > 0 ? s.SCRAPED : null
+        badge: s.ENRICHED > 0 ? s.ENRICHED : null
       })}
       ${toolCard({
         title: 'Image Editor',
@@ -2716,8 +2716,8 @@ function debCatalogSearch(val) {
 
 function _pipelineSubNav(active) {
   const stages = [
-    { id: 'queue',    label: 'Review',    count: stats.SCRAPED   },
-    { id: 'textEdit', label: 'Text Edit', count: stats.ENRICHED  },
+    { id: 'queue',    label: 'Review',    count: stats.ENRICHED      },
+    { id: 'textEdit', label: 'Text Edit', count: stats.TEXT_REMOVAL },
     { id: 'REVIEWED', label: 'Approved',  count: stats.REVIEWED  },
     { id: 'LIVE',     label: 'Posted',    count: stats.LIVE      },
     { id: 'catalog',  label: 'Catalog',   count: null            },
@@ -2781,7 +2781,7 @@ async function renderAnalytics() {
   const scoreDist = data.score_distribution || [];
   const providers = data.ai_providers || [];
 
-  const total = (stats.SCRAPED||0)+(stats.REVIEWED||0)+(stats.LIVE||0)+(stats.REJECTED||0);
+  const total = (stats.ENRICHED||0)+(stats.TEXT_REMOVAL||0)+(stats.REVIEWED||0)+(stats.LIVE||0)+(stats.REJECTED||0);
   const approvalRate = total ? Math.round(((stats.REVIEWED||0)+(stats.LIVE||0))/total*100) : 0;
 
   // Timeline sparkline (simple)
@@ -2859,7 +2859,7 @@ async function renderAnalytics() {
         <div class="dash-stat-card">
           <div class="dash-stat-label">Pending → Approved → Posted</div>
           <div class="dash-stat-val" style="font-size:20px;color:var(--t1)">
-            <span style="color:var(--blue)">${stats.SCRAPED||0}</span>
+            <span style="color:var(--blue)">${stats.ENRICHED||0}</span>
             <span style="color:var(--t3);font-size:14px">→</span>
             <span style="color:var(--green)">${stats.REVIEWED||0}</span>
             <span style="color:var(--t3);font-size:14px">→</span>
@@ -3014,7 +3014,7 @@ function renderChatProductCard(p) {
   const imgEl = img
     ? `<img src="${API.replace('/api','')}/api/image?url=${encodeURIComponent(img)}" onerror="this.style.display='none'" loading="lazy">`
     : `<div class="chat-card-no-img">📦</div>`;
-  const actionBtns = p.id && stage === 'SCRAPED' ? `
+  const actionBtns = p.id && stage === 'ENRICHED' ? `
     <div class="chat-card-actions">
       <button class="chat-card-approve-btn" onclick="chatQuickApprove(${p.id}, this)">✅ Approve</button>
       <button class="chat-card-reject-btn" onclick="chatQuickReject(${p.id}, this)">❌ Reject</button>

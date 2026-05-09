@@ -592,7 +592,7 @@ async def _stage_products(product_ids: List[int], stage: str, **kwargs) -> list:
     return changed
 
 def _approval_stage(product: dict) -> str:
-    return ProductStage.ENRICHED.value if product.get("has_chinese_text") else ProductStage.REVIEWED.value
+    return ProductStage.TEXT_REMOVAL.value if product.get("has_chinese_text") else ProductStage.REVIEWED.value
 
 def _items_to_stages(items: list) -> dict:
     stages: dict = {}
@@ -740,7 +740,7 @@ async def proxy_image(url: str):
 @app.post("/api/products/{product_id}/approve")
 async def approve_product(product_id: int):
     p = await _get_product_or_404(product_id)
-    _require_stage(p, ProductStage.SCRAPED.value, "Cannot approve product in stage '{stage}'")
+    _require_stage(p, ProductStage.ENRICHED.value, "Cannot approve product in stage '{stage}'")
     stage = _approval_stage(p)
     await db.set_stage(product_id, stage)
     await _backup_products_to_sheets()
@@ -750,7 +750,7 @@ async def approve_product(product_id: int):
 async def publish_to_website(product_id: int):
     """Publish a product directly to the website catalog (sets LIVE, no Instagram posting)."""
     p = await _get_product_or_404(product_id)
-    if p.get("stage") not in (ProductStage.REVIEWED.value, ProductStage.ENRICHED.value):
+    if p.get("stage") != ProductStage.REVIEWED.value:
         raise HTTPException(400, f"Product must be in REVIEWED stage to publish to website (current: {p.get('stage')})")
     await db.set_stage(product_id, ProductStage.LIVE.value)
     await _backup_products_to_sheets()
@@ -762,13 +762,13 @@ async def approve_products(body: ApproveRequest):
     text_edit = 0
     for pid in body.product_ids[:50]:
         p = await db.get_product(pid)
-        if p and p.get("stage") == ProductStage.SCRAPED.value:
+        if p and p.get("stage") == ProductStage.ENRICHED.value:
             stage = _approval_stage(p)
             await db.set_stage(pid, stage)
-            if stage == ProductStage.ENRICHED.value: text_edit += 1
+            if stage == ProductStage.TEXT_REMOVAL.value: text_edit += 1
             else: approved += 1
     await _backup_products_to_sheets()
-    return {"ok": True, "approved": approved, "text_edit": text_edit}
+    return {"ok": True, "TEXT_REMOVAL": text_edit, "REVIEWED": approved}
 
 @app.post("/api/reject")
 async def reject_products_batch(body: BatchRejectRequest):
@@ -799,7 +799,7 @@ async def reject_product_single(product_id: int, body: RejectRequest = None):
 
 @app.post("/api/products/{product_id}/reconsider")
 async def reconsider_product(product_id: int):
-    await db.set_stage(product_id, ProductStage.SCRAPED.value)
+    await db.set_stage(product_id, ProductStage.ENRICHED.value)
     await _backup_products_to_sheets()
     return {"ok": True}
 

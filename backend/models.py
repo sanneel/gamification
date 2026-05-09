@@ -10,9 +10,10 @@ from enum import Enum
 
 
 class ProductStage(str, Enum):
-    SCRAPED  = "SCRAPED"
-    ENRICHED = "ENRICHED"
-    REVIEWED = "REVIEWED"
-    QUEUED   = "QUEUED"
-    LIVE     = "LIVE"
-    REJECTED = "REJECTED"
+    SCRAPED      = "SCRAPED"
+    ENRICHED     = "ENRICHED"
+    TEXT_REMOVAL = "TEXT_REMOVAL"
+    REVIEWED     = "REVIEWED"
+    QUEUED       = "QUEUED"
+    LIVE         = "LIVE"
+    REJECTED     = "REJECTED"

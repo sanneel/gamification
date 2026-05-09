@@ -701,7 +701,7 @@ class Database:
 
     async def get_stats(self) -> dict:
         stats: dict = {}
-        for stage in ("SCRAPED", "REVIEWED", "ENRICHED", "LIVE", "REJECTED"):
+        for stage in ("SCRAPED", "ENRICHED", "TEXT_REMOVAL", "REVIEWED", "LIVE", "REJECTED"):
             val = await self.fetchval("SELECT COUNT(*) FROM products WHERE stage=$1", stage)
             stats[stage] = val if val else 0
 

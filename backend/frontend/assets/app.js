@@ -27,7 +27,7 @@ const IC = {
 };
 
 // ── State ──────────────────────────────────────────────────────────────────
-let currentPage = 'dashboard';
+let currentPage = 'queue';
 let stats = {};
 let selectedProducts = new Set();
 let activeJobPoll = null;
@@ -45,7 +45,6 @@ let catalogProducts = [], catalogTotal = 0, catalogStage = 'REVIEWED', catalogSe
 
 // ── Nav ────────────────────────────────────────────────────────────────────
 const NAV_PAGES = [
-  { id:'dashboard', label:'Dashboard',    icon:'dashboard' },
   { id:'pipeline',  label:'Pipeline',     icon:'queue'    },
   { id:'analytics', label:'Analytics',    icon:'analytics'},
   { id:'settings',  label:'Settings',     icon:'settings' },
@@ -224,105 +223,81 @@ function refreshStats() {
 
 // ── Dashboard ──────────────────────────────────────────────────────────────
 async function renderDashboard() {
-  setTitle('Dashboard', 'system overview & quick actions');
-  const topbar = document.getElementById('topbar-actions');
-  if (topbar) topbar.innerHTML = `<button class="btn btn-sm" onclick="renderDashboard()">↻ Refresh</button>`;
-  
-  const content = document.getElementById('content');
-  if (!content) return;
-  content.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--t3);font-family:var(--ff-m);font-size:12px">Loading dashboard...</div>`;
+  setTitle('Today');
+  document.getElementById('topbar-actions').innerHTML = '';
+  document.getElementById('content').innerHTML = '<div style="color:var(--t3);font-size:12px;padding:40px 0;text-align:center">Loading…</div>';
 
-  try {
-    const [s, jobs, settings] = await Promise.all([
-      cachedApi('/stats'),
-      api('/jobs?limit=5'),
-      cachedApi('/settings')
-    ]);
-    
-    stats = s;
-    settingsData = settings;
-    buildNav();
+  const [s, jobs] = await Promise.all([
+    api('/stats').catch(() => ({})),
+    api('/jobs?limit=5').catch(() => []),
+  ]);
+  stats = s; buildNav();
 
-    content.innerHTML = `
-      <div style="margin-bottom:30px">
-        <h1 style="font-family:var(--ff-d);font-style:italic;font-size:32px;margin-bottom:4px">Welcome to DropOS</h1>
-        <p style="color:var(--t3);font-size:13px">You have <strong style="color:var(--accent)">${s.SCRAPED || 0}</strong> products waiting for review.</p>
-      </div>
+  const scraped     = jobs[0]?.scraped      ?? 0;
+  const afterFilter = jobs[0]?.after_basic  ?? 0;
+  const afterProfit = jobs[0]?.after_profit ?? 0;
+  const afterDedup  = jobs[0]?.after_dedup  ?? 0;
+  const afterAI     = jobs[0]?.after_ai     ?? 0;
+  const maxVal = scraped || 1;
 
-      <div class="dash-stat-grid">
-        <div class="dash-stat-card" onclick="navigate('queue')" style="cursor:pointer">
-          <div class="dash-stat-label">Pending Review</div>
-          <div class="dash-stat-val" style="color:var(--amber)">${s.SCRAPED || 0}</div>
-          <div class="dash-stat-sub" style="font-size:11px;color:var(--t4);margin-top:4px">New items from scans</div>
-        </div>
-        <div class="dash-stat-card" onclick="navigate('REVIEWED')" style="cursor:pointer">
-          <div class="dash-stat-label">Ready to Post</div>
-          <div class="dash-stat-val" style="color:var(--green)">${s.REVIEWED || 0}</div>
-          <div class="dash-stat-sub" style="font-size:11px;color:var(--t4);margin-top:4px">Approved products</div>
-        </div>
-        <div class="dash-stat-card" onclick="navigate('LIVE')" style="cursor:pointer">
-          <div class="dash-stat-label">Published</div>
-          <div class="dash-stat-val" style="color:var(--blue)">${s.LIVE || 0}</div>
-          <div class="dash-stat-sub" style="font-size:11px;color:var(--t4);margin-top:4px">Live on storefront</div>
+  const pipeStages = [
+    { label: 'Scraped raw',      val: scraped,     color: '#606060' },
+    { label: 'After filter',     val: afterFilter, color: 'var(--blue)' },
+    { label: 'Margin threshold', val: afterProfit, color: 'var(--amber)' },
+    { label: 'After dedup',      val: afterDedup,  color: '#a78bfa' },
+    { label: 'AI passed',        val: afterAI,     color: 'var(--green)' },
+  ];
+
+  document.getElementById('content').innerHTML = `
+    <div class="dash-stat-grid">
+      <div class="dash-stat-card">
+        <div class="dash-stat-label">Ready to review</div>
+        <div class="dash-stat-val" style="color:var(--blue)">${s.SCRAPED ?? 0}</div>
+        <div class="dash-stat-actions">
+          <button class="dash-stat-btn" onclick="navigate('queue')">Review now</button>
+          <button class="dash-stat-btn" onclick="navigate('scan')">Find products</button>
         </div>
       </div>
-
-      <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:24px;margin-top:24px">
-        <div>
-          <div class="card" style="margin-bottom:24px">
-            <div class="card-title">System Health</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-              <div style="background:var(--s2);padding:12px;border-radius:var(--r);border:1px solid var(--b1)">
-                <div style="font-size:10px;color:var(--t4);text-transform:uppercase;margin-bottom:4px">Database</div>
-                <div style="font-size:13px;color:var(--green)">Connected & Stable</div>
-              </div>
-              <div style="background:var(--s2);padding:12px;border-radius:var(--r);border:1px solid var(--b1)">
-                <div style="font-size:10px;color:var(--t4);text-transform:uppercase;margin-bottom:4px">AI Provider</div>
-                <div style="font-size:13px;color:${settings.gemini_key?'var(--green)':'var(--red)'}">${settings.gemini_key?'Gemini Online':'Not Configured'}</div>
-              </div>
-              <div style="background:var(--s2);padding:12px;border-radius:var(--r);border:1px solid var(--b1)">
-                <div style="font-size:10px;color:var(--t4);text-transform:uppercase;margin-bottom:4px">Instagram API</div>
-                <div style="font-size:13px;color:${settings.instagram_access_token?'var(--green)':'var(--amber)'}">${settings.instagram_access_token?'Authorized':'Check Settings'}</div>
-              </div>
-              <div style="background:var(--s2);padding:12px;border-radius:var(--r);border:1px solid var(--b1)">
-                <div style="font-size:10px;color:var(--t4);text-transform:uppercase;margin-bottom:4px">Google Sheets</div>
-                <div style="font-size:13px;color:${settings.google_sheets_id?'var(--green)':'var(--t4)'}">${settings.google_sheets_id?'Sync Active':'Disabled'}</div>
-              </div>
-            </div>
-          </div>
-          
-          <div class="card">
-            <div class="card-title">Quick Actions</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-              <button class="btn" onclick="navigate('scan')" style="justify-content:center;padding:12px">Start New Scan</button>
-              <button class="btn" onclick="navigate('settings')" style="justify-content:center;padding:12px">Update Settings</button>
-              <button class="btn btn-amber" onclick="navigate('chat')" style="justify-content:center;padding:12px">Ask AI Assistant</button>
-              <button class="btn" onclick="window.open('https://instagram.com/','_blank')" style="justify-content:center;padding:12px">Open Instagram</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-title">Recent Activity</div>
-          <div style="display:flex;flex-direction:column;gap:12px">
-            ${jobs.length ? jobs.map(j => `
-              <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:10px;border-bottom:1px solid var(--b1)">
-                <div>
-                  <div style="font-size:12px;font-weight:500;color:var(--t2)">${escHtml(j.keywords?.[0] || 'Manual Job')}</div>
-                  <div style="font-size:10px;color:var(--t4)">${new Date(j.created_at).toLocaleDateString()}</div>
-                </div>
-                <div class="badge ${j.status==='done'?'badge-green':'badge-amber'}">${j.status}</div>
-              </div>
-            `).join('') : '<div style="color:var(--t4);font-size:12px;text-align:center;padding:20px">No recent jobs</div>'}
-          </div>
-          <button class="btn btn-sm" style="width:100%;margin-top:16px;justify-content:center" onclick="navigate('pipeline')">View All Pipeline Jobs</button>
+      <div class="dash-stat-card">
+        <div class="dash-stat-label">Approved</div>
+        <div class="dash-stat-val" style="color:var(--green)">${s.REVIEWED ?? 0}</div>
+        <div class="dash-stat-actions">
+          <button class="dash-stat-btn" onclick="navigate('REVIEWED')">Post next</button>
+          <button class="dash-stat-btn" onclick="navigate('LIVE')">Posted: ${s.LIVE ?? 0}</button>
         </div>
       </div>
-    `;
-  } catch (err) {
-    content.innerHTML = `<div style="color:var(--red);padding:40px;text-align:center">Error loading dashboard: ${err.message}</div>`;
-  }
-}
+      <div class="dash-stat-card">
+        <div class="dash-stat-label">Rejected</div>
+        <div class="dash-stat-val" style="color:var(--t3)">${s.REJECTED ?? 0}</div>
+        <div class="dash-stat-actions">
+          <button class="dash-stat-btn" onclick="navigate('REJECTED')">View rejected</button>
+          <button class="dash-stat-btn" style="cursor:default;opacity:.5">${s.approval_rate ?? 0}% approval</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat-card blue">
+        <div class="stat-label">Avg margin (queue)</div>
+        <div class="stat-val">${s.avg_margin_pending ?? 0}<span style="font-size:15px;font-weight:500">%</span></div>
+      </div>
+      <div class="stat-card purple">
+        <div class="stat-label">Avg AI score</div>
+        <div class="stat-val">${s.avg_score_pending ?? 0}</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-label">Posted 7 days</div>
+        <div class="stat-val">${s.LIVE_7d ?? 0}</div>
+      </div>
+      <div class="stat-card amber">
+        <div class="stat-label">Approval rate</div>
+        <div class="stat-val">${s.approval_rate ?? 0}<span style="font-size:15px;font-weight:500">%</span></div>
+      </div>
+      <div class="stat-card gray">
+        <div class="stat-label">Total scans</div>
+        <div class="stat-val">${s.total_jobs ?? 0}</div>
+      </div>
+    </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <div class="card">
@@ -540,8 +515,7 @@ async function renderQueue() {
 async function loadQueue(append = false) {
   const offset = append ? queueProducts.length : 0;
   if (!append) queueProducts = [];
-  const url = `/products?stage=SCRAPED&limit=50&offset=${offset}&sort=${queueSort}`;
-  const data = await (append ? api(url) : cachedApi(url)).catch(() => ({ products: [], total: 0 }));
+  const data = await api(`/products?stage=SCRAPED&limit=50&offset=${offset}&sort=${queueSort}`).catch(() => ({ products: [], total: 0 }));
   queueProducts = append ? queueProducts.concat(data.products) : data.products;
   queueTotal = data.total;
   renderQueueGrid();
@@ -586,8 +560,7 @@ async function renderApproved() {
 async function loadApproved(append = false) {
   const offset = append ? approvedProducts.length : 0;
   if (!append) approvedProducts = [];
-  const url = `/products?stage=REVIEWED&limit=50&offset=${offset}&sort=score`;
-  const data = await (append ? api(url) : cachedApi(url)).catch(() => ({ products: [], total: 0 }));
+  const data = await api(`/products?stage=REVIEWED&limit=50&offset=${offset}&sort=score`).catch(() => ({ products: [], total: 0 }));
   approvedProducts = append ? approvedProducts.concat(data.products) : data.products;
   approvedTotal = data.total;
   renderApprovedGrid();

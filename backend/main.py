@@ -777,6 +777,15 @@ async def reject_products_batch(body: BatchRejectRequest):
     await _backup_products_to_sheets()
     return {"ok": True, "rejected": len(body.product_ids)}
 
+@app.post("/api/reject-all-pending")
+async def reject_all_pending():
+    products = await db.get_products(stage=ProductStage.ENRICHED.value, limit=10000, offset=0, sort="score")
+    ids = [p["id"] for p in products]
+    if ids:
+        await _stage_products(ids, ProductStage.REJECTED.value)
+        await _backup_products_to_sheets()
+    return {"ok": True, "rejected": len(ids)}
+
 @app.post("/api/products/{product_id}/post")
 async def post_product_single(product_id: int, bg: BackgroundTasks):
     p = await _get_product_or_404(product_id)

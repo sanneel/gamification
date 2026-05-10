@@ -539,6 +539,7 @@ function renderQueueGrid() {
       <button class="btn btn-sm" onclick="selectAll()">Select all</button>
       <button class="btn btn-sm btn-green" onclick="selectAll();batchApprove()">Approve visible</button>
       <button class="btn btn-sm btn-danger" onclick="selectAll();batchReject()">Reject visible</button>
+      <button class="btn btn-sm btn-danger" onclick="rejectAllPending()">Reject All (${queueTotal})</button>
       <button class="btn btn-sm" onclick="clearSel()">Clear</button>
     </div>
     <div class="product-grid" id="product-grid">
@@ -782,6 +783,24 @@ async function batchReject() {
     await refreshStats();
     renderQueueGrid();
   } catch(e) {}
+}
+
+async function rejectAllPending() {
+  if (!queueTotal) return;
+  if (!confirm(`Reject ALL ${queueTotal} pending products? This cannot be undone.`)) return;
+  try {
+    const res = await api('/reject-all-pending', 'POST');
+    const done = res.rejected || queueTotal;
+    queueProducts = [];
+    queueTotal = 0;
+    selectedProducts.clear();
+    _cacheInvalidate('/products', '/stats');
+    await refreshStats();
+    toast(`❌ Rejected ${done} products`, 'success');
+    renderQueueGrid();
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+  }
 }
 
 async function batchPost() {
@@ -3050,15 +3069,12 @@ async function chatBulkApprove(ids, btn) {
   if (!confirm(`Approve ${ids.length} products?`)) return;
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Approving…'; }
   try {
-    let done = 0;
-    for (const id of ids) {
-      try { await api(`/products/${id}/approve`, 'POST'); done++; } catch(_) {}
-    }
+    const res = await api('/approve', 'POST', { product_ids: ids });
+    const done = (res.REVIEWED || 0) + (res.TEXT_REMOVAL || 0);
     _cacheInvalidate('/products', '/stats');
     await refreshStats();
     toast(`✅ Approved ${done} products!`, 'success');
     if (btn) { btn.textContent = `✅ Approved ${done}`; }
-    // Gray out approved cards
     document.querySelectorAll('.chat-product-card.rec-approve').forEach(c => c.classList.add('chat-card-done-approve'));
   } catch(e) {
     toast('Error: ' + e.message, 'error');
@@ -3071,10 +3087,8 @@ async function chatBulkReject(ids, btn) {
   if (!confirm(`Reject ${ids.length} products?`)) return;
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Rejecting…'; }
   try {
-    let done = 0;
-    for (const id of ids) {
-      try { await api(`/products/${id}/reject`, 'POST'); done++; } catch(_) {}
-    }
+    const res = await api('/reject', 'POST', { product_ids: ids });
+    const done = res.rejected || ids.length;
     _cacheInvalidate('/products', '/stats');
     await refreshStats();
     toast(`❌ Rejected ${done} products`, 'success');
@@ -3164,11 +3178,8 @@ async function chatApproveProducts(ids) {
   if (!ids?.length) return;
   if (!confirm(`Approve ${ids.length} products?`)) return;
   try {
-    let count = 0;
-    for (const id of ids.slice(0, 20)) {
-      await api(`/products/${id}/approve`, 'POST').catch(() => {});
-      count++;
-    }
+    const res = await api('/approve', 'POST', { product_ids: ids.slice(0, 50) });
+    const count = (res.REVIEWED || 0) + (res.TEXT_REMOVAL || 0);
     _cacheInvalidate('/products', '/stats');
     await refreshStats();
     toast(`✅ ${count} products approved!`, 'success');

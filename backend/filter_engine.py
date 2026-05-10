@@ -46,6 +46,28 @@ def profit_filter(product: dict, settings: dict) -> bool:
 
     return margin >= min_margin_req
 
+_DEMOGRAPHIC_REJECTS = [
+    "baby", "infant", "toddler", "newborn", "formula", "diaper",
+    "children's", "kids", "age 3", "age 4", "age 5", "age 6",
+    "toy for", "puzzle for kids", "educational toy",
+    "elderly", "senior", "walking cane", "mobility aid",
+    "maternity", "pregnant", "nursing", "mother's day", "mom gift",
+    "teacher gift", "teacher appreciation",
+]
+
+_INDUSTRY_REJECTS = [
+    "engine oil", "motor oil", "lubricant", "brake fluid",
+    "pest spray", "herbicide", "fertilizer", "agricultural",
+    "wholesale", "bulk order", "factory price", "moq", "minimum order",
+    "100pcs", "50pcs", "lot of", "per dozen", "oem", "odm",
+    "steel plate", "pvc pipe", "circuit board", "industrial",
+]
+
+_BRAND_REJECTS = [
+    "gucci", "louis vuitton", "chanel", "dior", "prada", "givenchy",
+    "cartier", "tiffany", "pandora", "swarovski", "rolex", "versace",
+]
+
 # B2B / bulk-manufacturing signals — "custom print" removed because retail
 # couple gift products (matching hoodies, phone cases) legitimately use it.
 _SPAM_FRAGMENTS = [
@@ -88,6 +110,24 @@ def basic_filter(products: list, settings: dict) -> list:
                 continue
 
         title_lower = (p.get("title_translated") or p.get("title", "")).lower()
+        desc_lower = (p.get("description") or "").lower()
+        text = f"{title_lower} {desc_lower}"
+
+        matched_demo = next((f for f in _DEMOGRAPHIC_REJECTS if f in text), None)
+        if matched_demo:
+            p["_bouncer_reason"] = f"hard_reject: demographic ({matched_demo!r})"
+            continue
+
+        matched_industry = next((f for f in _INDUSTRY_REJECTS if f in text), None)
+        if matched_industry:
+            p["_bouncer_reason"] = f"hard_reject: industry ({matched_industry!r})"
+            continue
+
+        matched_brand = next((f for f in _BRAND_REJECTS if f in text), None)
+        if matched_brand:
+            p["_bouncer_reason"] = f"hard_reject: brand ({matched_brand!r})"
+            continue
+
         matched_spam = next((f for f in _SPAM_FRAGMENTS if f in title_lower), None)
         if matched_spam:
             p["_bouncer_reason"] = f"Bouncer: spam keyword ({matched_spam!r})"

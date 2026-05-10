@@ -633,10 +633,22 @@ function renderTextEditGrid() {
 }
 
 // ── Product card ───────────────────────────────────────────────────────────
+function verdictBadge(verdict) {
+  if (!verdict) return '';
+  const cfg = {
+    top_priority:      ['badge-purple', 'top priority'],
+    strong_candidate:  ['badge-green',  'strong'],
+    pending_review:    ['badge-gray',   'pending review'],
+    auto_reject:       ['badge-red',    'auto reject'],
+  };
+  const [cls, label] = cfg[verdict] || ['badge-gray', verdict.replace(/_/g, ' ')];
+  return `<span class="badge ${cls}" style="align-self:flex-start;font-size:9px">${label}</span>`;
+}
+
 function productCard(p, mode) {
   const sel = selectedProducts.has(p.id);
   const img = imageUrl(firstImage(p));
-  const score = p.score || 0;
+  const score = p.composite_score || p.score || 0;
   const sc = score >= 8 ? 'hi' : score >= 7 ? 'mi' : 'lo';
 
   let actions = '';
@@ -674,6 +686,7 @@ function productCard(p, mode) {
       <div class="pcard-body">
         <div class="pcard-name editable" ondblclick="event.stopPropagation();startEdit(${p.id}, 'product_name', this)">${name}</div>
         ${p.has_chinese_text ? `<span class="badge badge-amber" style="align-self:flex-start">Chinese text</span>` : ''}
+        ${verdictBadge(p.verdict)}
         <div class="pcard-cat">${cat || '—'}</div>
         <div class="pcard-pricing">
           <span class="p-cost">₾${p.cost_eur ?? '?'}</span>
@@ -1107,7 +1120,7 @@ async function showDetail(id) {
         </div>
 
         <div class="detail-sec">
-          <span class="detail-sec-lbl">AI score — ${(p.score ?? 0).toFixed(1)} / 10</span>
+          <span class="detail-sec-lbl">AI score — ${(p.composite_score ?? p.score ?? 0).toFixed(1)} / 10</span>
           ${sBar('Niche fit',  p.niche_fit         ?? 0)}
           ${sBar('Visual',     p.visual_appeal     ?? 0)}
           ${sBar('Trend',      p.trend_score       ?? 0)}
@@ -1269,7 +1282,7 @@ async function renderPosted() {
                   </div>
                 </div>
               </td>
-              <td><span class="badge badge-purple">${(p.score ?? 0).toFixed(1)}</span></td>
+              <td><span class="badge badge-purple">${(p.composite_score ?? p.score ?? 0).toFixed(1)}</span></td>
               <td><span class="badge badge-green">${p.margin_pct ?? 0}%</span></td>
               <td style="font-family:var(--ff-m);color:var(--green);font-size:12px">₾${p.sell_price_eur ?? 0}</td>
               <td style="font-family:var(--ff-m);font-size:12px">${(p.orders ?? 0).toLocaleString()}</td>
@@ -1314,7 +1327,7 @@ function renderRejectedTable() {
                 <div style="font-weight:500;font-size:12.5px">${p.product_name || p.title_translated || '—'}</div>
                 <div style="font-size:10px;color:var(--t3);font-family:var(--ff-m)">${p.keyword || ''}</div>
               </td>
-              <td><span class="badge badge-gray">${(p.score ?? 0).toFixed(1)}</span></td>
+              <td><span class="badge badge-gray">${(p.composite_score ?? p.score ?? 0).toFixed(1)}</span></td>
               <td style="font-size:12px;color:var(--t3);max-width:180px">${p.rejection_reason || '<span style="opacity:.35">—</span>'}</td>
               <td style="font-size:11px;color:var(--t3);font-family:var(--ff-m);white-space:nowrap">${fmtDate(p.REJECTED_at)}</td>
               <td><button class="btn btn-sm btn-amber" onclick="reconsider(${p.id})">Reconsider</button></td>
@@ -2064,7 +2077,7 @@ async function renderPipeline() {
           <div>
             <div style="font-size:12px;color:var(--t3);margin-bottom:6px">Accepted examples</div>
             ${(summary.accepted_examples||[]).length
-              ? (summary.accepted_examples||[]).map(p => `<div style="font-size:12px;color:var(--t2);margin-bottom:4px">${(p.title||'').substring(0,42)} <span style="color:var(--green)">${Number(p.score||0).toFixed(1)}</span></div>`).join('')
+              ? (summary.accepted_examples||[]).map(p => `<div style="font-size:12px;color:var(--t2);margin-bottom:4px">${(p.title||'').substring(0,42)} <span style="color:var(--green)">${Number(p.composite_score||p.score||0).toFixed(1)}</span></div>`).join('')
               : `<div style="font-size:12px;color:var(--t4)">No accepted products yet</div>`}
           </div>
           <div>
@@ -2617,7 +2630,7 @@ function catalogRow(p, editMode = false) {
   const stageBadge = p.stage === 'LIVE'
     ? '<span class="badge" style="background:#3b82f6;color:#fff">Posted</span>'
     : '<span class="badge badge-green">Approved</span>';
-  const score = (p.score ?? 0).toFixed(1);
+  const score = (p.composite_score ?? p.score ?? 0).toFixed(1);
 
   if (editMode) {
     return `<tr id="cat-row-${p.id}" class="cat-row editing">
@@ -3019,7 +3032,7 @@ function renderChatProductCard(p) {
   const img = p.image_url || p.images?.[0] || '';
   const title = p.title_translated || p.product_name || p.title || 'Product';
   const price = (p.sell_price_eur || p.price) ? `€${Number(p.sell_price_eur || p.price).toFixed(2)}` : '';
-  const score = p.score ? `${p.score}` : '';
+  const score = (p.composite_score || p.score) ? `${(p.composite_score || p.score).toFixed ? Number(p.composite_score || p.score).toFixed(1) : p.composite_score || p.score}` : '';
   const niche = p.niche_fit ? `nf:${p.niche_fit}` : '';
   const stage = p.stage || '';
   const rec = p.recommendation || '';

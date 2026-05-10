@@ -134,11 +134,22 @@ async def run_worker_loop():
 
                 # c. Persist everything in one DB update
                 updates = {
-                    "caption": res.get("caption") or p.get("caption") or "",
-                    "hashtags_json": json.dumps(res.get("hashtags") or p.get("hashtags") or []),
-                    "product_name": res.get("product_name", p.get("product_name", "")),
-                    "audience": res.get("audience") or "",
-                    "stage": ProductStage.ENRICHED.value,
+                    "caption":         res.get("caption") or p.get("caption") or "",
+                    "hashtags_json":   json.dumps(res.get("hashtags") or p.get("hashtags") or []),
+                    "product_name":    res.get("product_name") or p.get("product_name", ""),
+                    "audience":        res.get("audience") or "",
+                    "stage":           ProductStage.ENRICHED.value,
+                    # scoring fields — allowlist gate opened in database.py
+                    "score":           float(res.get("composite_score") or res.get("score") or 0),
+                    "niche_fit":       float(res.get("niche_fit") or 0),
+                    "visual_appeal":   float(res.get("visual_appeal") or 0),
+                    "trend_score":     float(res.get("trend_score") or 0),
+                    "composite_score": float(res.get("composite_score") or 0),
+                    "verdict":         res.get("verdict") or "",
+                    "product_tier":    res.get("product_tier") or "",
+                    "confidence":      float(res.get("confidence") or 0),
+                    "viral_angle":     res.get("viral_angle") or "",
+                    "emotional_hook":  res.get("emotional_hook") or "",
                 }
 
                 if new_image_url and images:

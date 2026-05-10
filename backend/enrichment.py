@@ -39,115 +39,121 @@ def _get_semaphore() -> asyncio.Semaphore:
 # ── Prompts ────────────────────────────────────────────────────────────────────
 
 _GEMINI_SYSTEM = """
-You are a Senior Product Analyst for "წყვილი" — a viral couples ecommerce brand targeting Gen Z and young adults aged 16-24.
-You will be shown a COLLAGE of 2-6 products arranged in a grid.
+You are an elite product curator for CUTE COUPLE GIFTS — a premium Gen-Z and Millennial couple gift brand on Instagram. You should reject the majority of what you see. Only genuinely postable, scroll-stopping couple products survive.
+
+You will be shown a COLLAGE of up to 6 products arranged in a grid.
 - Row 1: Left=Prod 1, Right=Prod 2
 - Row 2: Left=Prod 3, Right=Prod 4
 - Row 3: Left=Prod 5, Right=Prod 6
 
-The store sells emotionally resonant, impulse-buyable, shareable products: jewelry, matching items, bedroom decor, cute accessories, personalized gifts, TikTok-style trending products, kawaii items, Y2K aesthetics, long-distance gifts, cozy couple items.
+THE BRAND:
+- Aesthetic: dark romance, minimalist silver, soft pink, Y2K, cottagecore
+- Audience: couples aged 16–30, buying gifts for each other
+- Platform: Instagram + TikTok — every product must be visually postable
+- Price feel: premium-looking even if affordable
+- NOT: generic, childish, grandma gifts, home decor, hobby items, fashion accessories without a clear couple angle
 
-Your mission: find products with the highest probability of becoming emotionally viral, impulse-purchased, and shareable on TikTok, Instagram Reels, and Pinterest.
+HARD REJECT — score 0 and verdict auto_reject immediately if ANY applies:
+- Plush toys, stuffed animals, or cartoon characters (Stitch, Sanrio, Barbie, Disney, Pokémon — all rejected)
+- Generic gift sets with no specific couple identity (random mugs, notebooks, pens, cosmetics)
+- Any item marketed to mothers, teachers, children, elderly, or professionals
+- Chinese watermarks or supplier branding visible in the image
+- Industrial, automotive, agricultural, or B2B products
+- Luxury brand dupes or counterfeits
+- Food, supplements, or consumables
+- Products with no visual aesthetic (plain white background, no styling)
 
-═══ HARD REJECT RULES — evaluate BEFORE scoring ═══
-Immediately set verdict="auto_reject" and store_match=false if ANY rule triggers:
-1. B2B / INDUSTRIAL: wholesale, factory, bulk, OEM, machine parts, automotive, plumbing, electrical components
-2. EMOTIONALLY DEAD + NO COUPLE ANGLE: zero romantic/aesthetic/emotional application AND no creative reframe possible
-3. WRONG DEMOGRAPHIC: clearly targets 35+ professionals, children under 12, or elderly with no youth aesthetic crossover
-4. IMPOSSIBLE COUPLE ANGLE: products where relationship framing requires absurd creative stretch (engine oil, medical devices, garden hoses)
-5. VISUALLY UNREDEEMABLE: product looks like a stock photo reject — blurry, grey background wholesale listing with no lifestyle appeal
+SCORING (each 0–10):
+couple_angle (weight 0.30): Is this made for couples or easily gifted between partners?
+  10=designed exclusively for couples (matching set, distance lamp), 5=plausible couple gift (candle, jewelry), 0=no couple application (plush toy, office item)
 
-═══ PRODUCT TIER — classify before scoring ═══
-TIER 1 — CORE COUPLE: inherently designed for couples or romance. No reframing needed.
-Examples: matching jewelry, couple keychains, love letters, anniversary keepsakes, his & hers sets, long-distance touch lamps, promise rings, couple photo frames, heart lockets.
+emotional_trigger (weight 0.25): Does it make someone feel love, nostalgia, longing, excitement?
+  10=deep emotional product (fingerprint keychain, long-distance lamp), 5=pleasant but neutral (generic bracelet), 0=emotionally dead (USB hub, random gift set)
 
-TIER 2 — VIRAL ADJACENT: not inherently couple-specific but EASILY activated with a relationship/emotional angle.
-Examples: neon signs, star projectors, cozy plushies, aesthetic candles, cute LED lights, kawaii accessories, Y2K jewelry, aesthetic phone cases, Polaroid cameras, mood lamps, matching hoodies, cute mugs.
-IMPORTANT: Do NOT reject Tier 2 just because it's not labeled "couple." If it has viral potential + emotional resonance that a couple TikTok creator could activate — PASS IT.
+visual_score (weight 0.20): Is the product image Instagrammable without editing?
+  10=scroll-stopping dark/moody/aesthetic no watermarks, 5=clean product shot usable, 2=Chinese watermarks/cluttered/supplier stock photo, 0=unusable image
 
-═══ SCORING DIMENSIONS — all 1-10 ═══
-A. emotional_trigger (weight 0.25): Does it create feelings of love, attachment, intimacy, or relationship identity? Could someone buy it to express affection without words? 10 = instant "I need this for us" reaction.
-B. viral_potential (weight 0.20): Would this perform in short-form video? Does it have satisfying visuals, glow, transformation, animation, reveal, or personalization moment? 10 = built for TikTok.
-C. giftability (weight 0.20): Easy to gift for birthdays, anniversaries, Valentine's Day, or "just because"? Impulse-giftable for a 16-24 year old on a student budget? 10 = perfect gift, instant yes.
-D. aesthetic_fit (weight 0.15): Matches Gen Z visual preferences — soft/pastel, black luxury, kawaii, Y2K, cozy, romantic, minimalist, TikTok-core? 10 = born for a couple aesthetic feed.
-E. impulse_score (weight 0.15): Can someone buy this within 5-15 seconds of seeing it? Is the wow factor immediate? 10 = instant impulse purchase.
-F. audience_fit (weight 0.05): How well does it fit the 16-24 couple demographic specifically? 10 = made for young couples.
+trend_alignment (weight 0.15): Does this fit what Gen-Z couples actually want right now?
+  10=actively trending (Y2K, dark romance, coquette, kawaii matching), 5=timeless couple style, 0=dated or completely off-trend
 
-═══ COMPOSITE SCORE FORMULA ═══
-composite = (emotional_trigger*0.25) + (viral_potential*0.20) + (giftability*0.20) + (aesthetic_fit*0.15) + (impulse_score*0.15) + (audience_fit*0.05)
+demographic_fit (weight 0.10): Is this for 16–30 year old couples?
+  10=unmistakably this audience, 0=wrong demographic entirely (kids, elderly, professional)
 
-═══ VERDICT THRESHOLDS ═══
-top_priority:     composite >= 8.0 AND emotional_trigger >= 8
-strong_candidate: composite >= 6.5 AND emotional_trigger >= 6
-pending_review:   composite >= 5.0
-auto_reject:      composite < 5.0 OR hard reject rule triggered
+COMPOSITE FORMULA:
+composite = (couple_angle×0.30) + (emotional_trigger×0.25) + (visual_score×0.20) + (trend_alignment×0.15) + (demographic_fit×0.10)
+
+VERDICT RULES:
+- top_priority:     composite ≥ 8.0 AND emotional_trigger ≥ 8
+- strong_candidate: composite ≥ 7.0 AND emotional_trigger ≥ 6
+- pending_review:   composite ≥ 6.0
+- auto_reject:      composite < 6.0 OR any hard reject triggered
 
 store_match = true ONLY IF verdict in ["top_priority", "strong_candidate"]
 
-═══ TREND-ADJACENT BONUS ═══
-If the product is Tier 2 (viral adjacent) AND has clear TikTok/viral visual potential, apply a +0.5 mental boost to composite before thresholding. Do not penalize for being non-traditional — evaluate as if marketed to a young couple audience.
-
-═══ OUTPUT — JSON only, no markdown ═══
-Return {"results": [...]} with one object per product in collage order.
-Each object must include ALL of these fields:
+OUTPUT — {"results": [...]} JSON only, one object per product in collage order:
 {
   "product_index": 1,
-  "product_tier": "core_couple" | "viral_adjacent" | "rejected",
-  "composite_score": 7.4,
-  "scores": {
-    "emotional_trigger": 8,
-    "viral_potential": 7,
-    "giftability": 8,
-    "aesthetic_fit": 7,
-    "impulse_score": 7,
-    "audience_fit": 8
-  },
-  "confidence": 0.80,
-  "verdict": "strong_candidate",
-  "store_match": true,
-  "viral_angle": "POV: getting this for your girlfriend — one sentence TikTok hook",
-  "emotional_hook": "one sentence describing the emotional trigger",
-  "content_hooks": ["reaction video", "unboxing", "couple challenge"],
-  "rejection_reason": "",
-  "product_name": "Georgian name 3-5 words (only if store_match=true)",
-  "caption": "Georgian caption 2-3 sentences (only if store_match=true)",
+  "couple_angle": 0-10,
+  "emotional_trigger": 0-10,
+  "visual_score": 0-10,
+  "trend_alignment": 0-10,
+  "demographic_fit": 0-10,
+  "composite": float,
+  "verdict": "top_priority|strong_candidate|pending_review|auto_reject",
+  "product_tier": "core_couple|viral_adjacent|sentimental|lifestyle|auto_reject",
+  "confidence": 0.0-1.0,
+  "store_match": true|false,
+  "viral_angle": "one sentence TikTok hook or null",
+  "emotional_hook": "one sentence emotional trigger or null",
+  "rejection_reason": "string or null",
+  "product_name": "Georgian name 3-5 words if store_match=true else empty string",
+  "caption": "Georgian caption 2-3 sentences if store_match=true else empty string",
   "hashtags": []
 }
 """
 
 _GROQ_SYSTEM = """
-You are a Senior Product Analyst for "წყვილი" — a viral couples ecommerce brand targeting Gen Z and young adults aged 16-24.
-NOTE: TEXT-ONLY analysis — no image access. Score visual dimensions conservatively.
+You are an elite product curator for CUTE COUPLE GIFTS — a premium Gen-Z and Millennial couple gift brand on Instagram. You should reject the majority of what you see.
+NOTE: TEXT-ONLY analysis — no image access. Cap visual_score at 6 unless the title or description clearly confirms aesthetic quality.
 
-The store sells emotionally resonant, impulse-buyable, shareable products: jewelry, matching items, bedroom decor, cute accessories, personalized gifts, TikTok-style trending products, kawaii items, Y2K aesthetics, long-distance gifts.
+THE BRAND:
+- Aesthetic: dark romance, minimalist silver, soft pink, Y2K, cottagecore
+- Audience: couples aged 16–30, buying gifts for each other
+- NOT: generic, childish, grandma gifts, home decor, hobby items, fashion accessories without a clear couple angle
 
-HARD REJECT: B2B/industrial/wholesale signals, zero emotional angle with no couple reframe possible, clearly wrong demographic (under 12 / over 35 professionals), impossible couple angle.
+HARD REJECT — verdict="auto_reject" immediately if ANY applies:
+- Plush toys, stuffed animals, cartoon characters (Stitch, Sanrio, Barbie, Disney, Pokémon)
+- Generic gift sets with no specific couple identity (random mugs, notebooks, pens, cosmetics)
+- Items marketed to mothers, teachers, children, elderly, or professionals
+- Industrial, automotive, agricultural, or B2B products
+- Luxury brand dupes or counterfeits
+- Food, supplements, or consumables
 
-PRODUCT TIERS:
-- core_couple: inherently couple/romance products (matching jewelry, love gifts, anniversary items)
-- viral_adjacent: not couple-specific but activatable with emotional/relationship angle (neon signs, star projectors, plushies, aesthetic candles, kawaii items, Y2K accessories)
-- rejected: hard reject triggered
+SCORING (each 0–10):
+couple_angle (0.30): Made for couples or easily gifted between partners? 10=exclusively for couples, 0=no couple application
+emotional_trigger (0.25): Creates feelings of love, nostalgia, longing, excitement? 10=deep emotional product, 0=emotionally dead
+visual_score (0.20): Instagram-worthy? TEXT-ONLY: cap at 6 unless title confirms premium aesthetic
+trend_alignment (0.15): Fits Gen-Z couple trends now? 10=Y2K/dark romance/coquette/kawaii, 0=dated
+demographic_fit (0.10): For 16–30 year old couples? 10=unmistakably, 0=wrong demographic
 
-SCORING DIMENSIONS (1-10):
-- emotional_trigger (0.25): Love, attachment, intimacy, relationship identity
-- viral_potential (0.20): TikTok/Reels performance potential, visual wow
-- giftability (0.20): Easy impulse gift for 16-24 year olds
-- aesthetic_fit (0.15): Gen Z visual preferences — kawaii, Y2K, cozy, minimalist, romantic
-- impulse_score (0.15): Buy within 5-15 seconds of seeing it
-- audience_fit (0.05): Fit for 16-24 young couples
+composite = (couple_angle×0.30) + (emotional_trigger×0.25) + (visual_score×0.20) + (trend_alignment×0.15) + (demographic_fit×0.10)
 
-composite = (emotional_trigger*0.25) + (viral_potential*0.20) + (giftability*0.20) + (aesthetic_fit*0.15) + (impulse_score*0.15) + (audience_fit*0.05)
+VERDICT: top_priority (≥8.0 AND emotional_trigger≥8) | strong_candidate (≥7.0 AND emotional_trigger≥6) | pending_review (≥6.0) | auto_reject (<6.0)
+store_match = true ONLY IF top_priority or strong_candidate
 
-VERDICT THRESHOLDS:
-top_priority:     composite >= 8.0 AND emotional_trigger >= 8
-strong_candidate: composite >= 6.5 AND emotional_trigger >= 6
-pending_review:   composite >= 5.0
-auto_reject:      composite < 5.0 OR hard reject triggered
-
-store_match = true ONLY IF verdict in ["top_priority", "strong_candidate"]
-
-OUTPUT: JSON only, no markdown.
-Fields: product_tier, composite_score, scores (object with 6 sub-scores), confidence, verdict, store_match, viral_angle, emotional_hook, content_hooks (array), rejection_reason, product_name (Georgian 3-5 words if passed), caption (Georgian 2-3 sentences if passed), hashtags (array).
+Return ONLY JSON (no markdown):
+{
+  "couple_angle": 0-10, "emotional_trigger": 0-10, "visual_score": 0-10,
+  "trend_alignment": 0-10, "demographic_fit": 0-10, "composite": float,
+  "verdict": "top_priority|strong_candidate|pending_review|auto_reject",
+  "product_tier": "core_couple|viral_adjacent|sentimental|lifestyle|auto_reject",
+  "confidence": 0.0-1.0, "store_match": true|false,
+  "viral_angle": "one sentence or null", "emotional_hook": "one sentence or null",
+  "rejection_reason": "string or null",
+  "product_name": "Georgian 3-5 words if store_match=true else empty string",
+  "caption": "Georgian 2-3 sentences if store_match=true else empty string",
+  "hashtags": []
+}
 """
 
 # ── Audience inference ─────────────────────────────────────────────────────────
@@ -217,47 +223,70 @@ def _normalize_enrichment(result: dict, product: dict, provider: str) -> dict:
     """
     Coerce an AI response into the canonical enrichment schema.
 
-    Handles both the new schema (composite_score + scores sub-object) and the
-    legacy schema (score + niche_fit + visual_appeal + trend_score) so that
-    old Groq/mock responses still work during a rolling deployment.
+    Handles three input shapes:
+    - New flat schema: couple_angle, emotional_trigger, visual_score, trend_alignment,
+      demographic_fit, composite — produced by the current prompts.
+    - Mid-generation schema: composite_score + scores sub-object.
+    - Legacy schema: niche_fit + visual_appeal + trend_score (old Groq/mock).
     """
-    # ── Derive composite_score ─────────────────────────────────────────────────
-    if "composite_score" not in result:
-        # Legacy schema: reconstruct composite from old fields
-        niche  = float(result.get("niche_fit", 0))
-        visual = float(result.get("visual_appeal", 0))
-        trend  = float(result.get("trend_score", 0))
-        result["composite_score"] = round(niche * 0.50 + visual * 0.30 + trend * 0.20, 2)
+    new_schema = "couple_angle" in result or (
+        "composite" in result and "composite_score" not in result
+    )
+
+    if new_schema:
+        # ── New flat schema ────────────────────────────────────────────────────
+        couple    = float(result.get("couple_angle", 0))
+        emotional = float(result.get("emotional_trigger", 0))
+        visual    = float(result.get("visual_score", 0))
+        trend     = float(result.get("trend_alignment", 0))
+        demo      = float(result.get("demographic_fit", 0))
+        composite = float(result.get("composite", 0))
+        # Recompute if the AI returned 0 (safety net)
+        if composite == 0 and (couple + emotional + visual + trend + demo) > 0:
+            composite = round(couple*0.30 + emotional*0.25 + visual*0.20 + trend*0.15 + demo*0.10, 2)
+        result["composite_score"] = composite
+        result["scores"] = {
+            "couple_angle":      round(couple, 1),
+            "emotional_trigger": round(emotional, 1),
+            "visual_score":      round(visual, 1),
+            "trend_alignment":   round(trend, 1),
+            "demographic_fit":   round(demo, 1),
+        }
+    else:
+        # ── Legacy / mid-generation schema ────────────────────────────────────
+        if "composite_score" not in result:
+            niche_l  = float(result.get("niche_fit", 0))
+            visual_l = float(result.get("visual_appeal", 0))
+            trend_l  = float(result.get("trend_score", 0))
+            result["composite_score"] = round(niche_l*0.50 + visual_l*0.30 + trend_l*0.20, 2)
+        composite = float(result["composite_score"])
+
+        if "scores" not in result:
+            niche_l  = float(result.get("niche_fit", 0))
+            visual_l = float(result.get("visual_appeal", 0))
+            trend_l  = float(result.get("trend_score", 0))
+            fallback = round(composite * 0.9, 1) if composite else 0.0
+            result["scores"] = {
+                "emotional_trigger": round(niche_l, 1) if niche_l else fallback,
+                "viral_potential":   round(trend_l, 1) if trend_l else fallback,
+                "giftability":       round(niche_l * 0.9, 1) if niche_l else fallback,
+                "aesthetic_fit":     round(visual_l, 1) if visual_l else fallback,
+                "impulse_score":     round(trend_l * 0.9, 1) if trend_l else fallback,
+                "audience_fit":      round(niche_l * 0.85, 1) if niche_l else fallback,
+            }
+        emotional = float(result["scores"].get("emotional_trigger", 0))
 
     composite = float(result.get("composite_score", 0))
-
-    # ── Ensure scores sub-object exists ───────────────────────────────────────
-    if "scores" not in result:
-        niche  = float(result.get("niche_fit", 0))
-        visual = float(result.get("visual_appeal", 0))
-        trend  = float(result.get("trend_score", 0))
-        # When no legacy sub-scores exist either, use composite * 0.9 as a
-        # conservative floor — avoids inflating emotional_trigger to composite
-        # which would incorrectly promote pending_review products to top_priority.
-        fallback = round(composite * 0.9, 1) if composite else 0.0
-        result["scores"] = {
-            "emotional_trigger": round(niche, 1) if niche else fallback,
-            "viral_potential":   round(trend, 1) if trend else fallback,
-            "giftability":       round(niche * 0.9, 1) if niche else fallback,
-            "aesthetic_fit":     round(visual, 1) if visual else fallback,
-            "impulse_score":     round(trend * 0.9, 1) if trend else fallback,
-            "audience_fit":      round(niche * 0.85, 1) if niche else fallback,
-        }
-
-    emotional = float(result["scores"].get("emotional_trigger", 0))
+    if new_schema:
+        emotional = float(result.get("emotional_trigger", 0))
 
     # ── Derive verdict ─────────────────────────────────────────────────────────
     if "verdict" not in result:
         if composite >= 8.0 and emotional >= 8:
             verdict = "top_priority"
-        elif composite >= 6.5 and emotional >= 6:
+        elif composite >= 7.0 and emotional >= 6:
             verdict = "strong_candidate"
-        elif composite >= 5.0:
+        elif composite >= 6.0:
             verdict = "pending_review"
         else:
             verdict = "auto_reject"
@@ -268,7 +297,7 @@ def _normalize_enrichment(result: dict, product: dict, provider: str) -> dict:
         result["store_match"] = result["verdict"] in ("top_priority", "strong_candidate")
 
     # ── Fill optional fields ───────────────────────────────────────────────────
-    result.setdefault("product_tier", "rejected" if not result["store_match"] else "core_couple")
+    result.setdefault("product_tier", "auto_reject" if not result["store_match"] else "core_couple")
     result.setdefault("confidence", 0.70)
     result.setdefault("viral_angle", "")
     result.setdefault("emotional_hook", "")
@@ -283,11 +312,15 @@ def _normalize_enrichment(result: dict, product: dict, provider: str) -> dict:
     result["ai_provider"] = provider
 
     # Backfill legacy top-level fields so database.py write paths never store zeros.
-    # database.py reads niche_fit/visual_appeal/trend_score directly from the product dict.
     result.setdefault("score", composite)
-    result.setdefault("niche_fit",     result["scores"]["emotional_trigger"])
-    result.setdefault("visual_appeal", result["scores"]["aesthetic_fit"])
-    result.setdefault("trend_score",   result["scores"]["viral_potential"])
+    if new_schema:
+        result.setdefault("niche_fit",     float(result.get("emotional_trigger", 0)))
+        result.setdefault("visual_appeal", float(result.get("visual_score", 0)))
+        result.setdefault("trend_score",   float(result.get("trend_alignment", 0)))
+    else:
+        result.setdefault("niche_fit",     result["scores"].get("emotional_trigger", 0))
+        result.setdefault("visual_appeal", result["scores"].get("aesthetic_fit", 0))
+        result.setdefault("trend_score",   result["scores"].get("viral_potential", 0))
 
     return result
 
@@ -300,20 +333,19 @@ def mock_enrich(product: dict) -> dict:
     margin_bonus = min(15, max(0, (margin - 60) / 4))
     adjusted     = min(100, raw_score + margin_bonus)
     base         = adjusted / 10
-    composite    = round(min(10.0, max(1.0, base + random.uniform(0.1, 0.5))), 1)
 
-    emotional = round(min(10.0, composite * random.uniform(0.85, 1.05)), 1)
-    viral     = round(min(10.0, composite * random.uniform(0.75, 1.15)), 1)
-    gift      = round(min(10.0, composite * random.uniform(0.80, 1.10)), 1)
-    aesthetic = round(min(10.0, composite * random.uniform(0.80, 1.10)), 1)
-    impulse   = round(min(10.0, composite * random.uniform(0.75, 1.10)), 1)
-    audience  = round(min(10.0, composite * random.uniform(0.80, 1.05)), 1)
+    couple    = round(min(10.0, max(1.0, base * random.uniform(0.80, 1.05))), 1)
+    emotional = round(min(10.0, base * random.uniform(0.85, 1.05)), 1)
+    visual    = round(min(10.0, base * random.uniform(0.75, 1.10)), 1)
+    trend     = round(min(10.0, base * random.uniform(0.75, 1.10)), 1)
+    demo      = round(min(10.0, base * random.uniform(0.80, 1.05)), 1)
+    composite = round(couple*0.30 + emotional*0.25 + visual*0.20 + trend*0.15 + demo*0.10, 1)
 
     if composite >= 8.0 and emotional >= 8:
         verdict = "top_priority"
-    elif composite >= 6.5 and emotional >= 6:
+    elif composite >= 7.0 and emotional >= 6:
         verdict = "strong_candidate"
-    elif composite >= 5.0:
+    elif composite >= 6.0:
         verdict = "pending_review"
     else:
         verdict = "auto_reject"
@@ -321,16 +353,20 @@ def mock_enrich(product: dict) -> dict:
     store_match = verdict in ("top_priority", "strong_candidate")
 
     return {
-        "product_tier":    "core_couple" if store_match else "rejected",
-        "composite_score": composite,
-        "score":           composite,
+        "couple_angle":      couple,
+        "emotional_trigger": emotional,
+        "visual_score":      visual,
+        "trend_alignment":   trend,
+        "demographic_fit":   demo,
+        "product_tier":      "core_couple" if store_match else "auto_reject",
+        "composite_score":   composite,
+        "score":             composite,
         "scores": {
+            "couple_angle":      couple,
             "emotional_trigger": emotional,
-            "viral_potential":   viral,
-            "giftability":       gift,
-            "aesthetic_fit":     aesthetic,
-            "impulse_score":     impulse,
-            "audience_fit":      audience,
+            "visual_score":      visual,
+            "trend_alignment":   trend,
+            "demographic_fit":   demo,
         },
         "confidence":        0.60,
         "verdict":           verdict,
@@ -344,8 +380,11 @@ def mock_enrich(product: dict) -> dict:
         "audience":          infer_audience(product),
         "has_chinese_text":  False,
         "chinese_text_note": "",
-        "rejection_reason":  "" if store_match else "Score below threshold for niche",
+        "rejection_reason":  "" if store_match else "Score below threshold",
         "ai_provider":       "mock",
+        "niche_fit":         emotional,
+        "visual_appeal":     visual,
+        "trend_score":       trend,
     }
 
 
@@ -511,14 +550,14 @@ async def groq_enrich(product: dict, settings: dict) -> Optional[dict]:
 
     title = product.get("title_translated") or product.get("title", "Unknown")
 
+    desc = (product.get("description") or "")[:300]
     user_content = (
         f"Title: {title}\n"
-        f"Category: {product.get('category', '?')}\n"
-        f"Cost: ₾{product.get('cost_eur','?')} → Sell: ₾{product.get('sell_price_eur','?')} "
-        f"({product.get('margin_pct','?')}% margin)\n"
-        f"Sold: {product.get('orders', 0)} | Rating: {product.get('rating', 0)}/5\n"
-        f"Keyword searched: {product.get('keyword', '?')}\n\n"
-        "NOTE: No image available. Score conservatively on visual_appeal.\n"
+        f"Description: {desc}\n"
+        f"Category: {product.get('keyword') or product.get('category', '?')}\n"
+        f"Sell price: ₾{product.get('sell_price_eur','?')}\n"
+        f"Orders: {product.get('orders', 0)} | Rating: {product.get('rating', 0)}/5\n\n"
+        "NOTE: No image available. Cap visual_score at 6 unless title confirms premium aesthetic.\n"
         "Respond with ONLY a JSON object — no markdown, no explanation."
     )
 

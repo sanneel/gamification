@@ -47,18 +47,19 @@ WHEN REVIEWING PENDING/REVIEWED PRODUCTS (most important feature):
 - Return action="review_pending" with:
   - products=[...all pending products with an added "recommendation": "approve"|"reject" and "reason": "..." field]
   - reply: a brief summary like "Reviewed 12 products: 7 approve, 5 reject"
-- APPROVE criteria: score >= 8.0, couple-forward category, clean image, clear couple/relationship angle
-- REJECT criteria: score < 7.5, generic with no couple angle, Chinese text without note, children's toys, random gadgets
+- APPROVE criteria: verdict in ["top_priority","strong_candidate"] OR composite_score >= 6.5 with emotional_trigger >= 6. Also approve viral-adjacent products (neon signs, star projectors, kawaii, aesthetic decor, matching hoodies, plushies) if they have a clear couple/emotional angle even without a traditional "couple" label.
+- REJECT criteria: verdict="auto_reject" OR composite_score < 5.0, OR product is emotionally empty with no couple angle, Chinese text without note, industrial/B2B items, children's toys for under-12.
 - Keep "reason" under 12 words to save tokens. Return ONLY id, recommendation, reason in the products array.
 
 WHEN SUGGESTING EDITS:
 - Return action="edit_products" with edits=[{id, title, price}] — only include fields that actually need changing.
-- Focus on: making titles more romantic and emotionally resonant, fixing prices (e.g. €39.9 → €39.90), improving captions for couple appeal.
+- Focus on: making titles more romantic and emotionally resonant, fixing prices (e.g. €39.9 → €39.90), improving captions for couple appeal. For viral-adjacent products, reframe title to activate the couple angle.
 
 WHEN REVIEWING REJECTED PRODUCTS look for:
-- score >= 7.0 OR niche_fit >= 7.5 (borderline rejections worth reconsidering)
+- composite_score >= 6.0 OR emotional_trigger >= 6 (borderline rejections worth reconsidering)
+- verdict="pending_review" products — these need manual eyes, not auto-rejection
 - Products with "Chinese text" as rejection reason (fixable with Clipdrop)
-- Couple-forward categories: Jewellery, Accessories, Phone Cases, Stationery, Home Decor
+- Viral-adjacent categories worth reconsidering: Home Decor, Lighting, Candles, Plush, Aesthetic Accessories, Y2K items, Kawaii products
 - Products with high orders (>500) that were rejected — proven demand
 
 WHEN ASKED ABOUT ANALYTICS OR PERFORMANCE:
@@ -95,20 +96,21 @@ def _rule_based_review_pending(context: dict) -> dict:
         }
     products = []
     for p in pending:
-        score = float(p.get("score") or 0)
-        niche = float(p.get("niche_fit") or 0)
-        if score >= 7.5 or niche >= 7.5:
+        composite = float(p.get("composite_score") or p.get("score") or 0)
+        emotional = float((p.get("scores") or {}).get("emotional_trigger") or p.get("niche_fit") or 0)
+        verdict   = p.get("verdict", "")
+        if verdict == "top_priority" or (composite >= 7.5 and emotional >= 7):
             rec = "approve"
-            reason = f"Strong scores: ⭐{score} score, 💜{niche} niche fit — solid pick"
-        elif score >= 6.5 or niche >= 6.5:
+            reason = f"Top pick: composite {composite:.1f}, emotional {emotional:.1f}"
+        elif verdict == "strong_candidate" or composite >= 6.5:
             rec = "approve"
-            reason = f"Good scores: ⭐{score} score, 💜{niche} niche fit — worth approving"
-        elif score >= 5.5 and niche >= 5.0:
+            reason = f"Strong candidate: composite {composite:.1f}, emotional {emotional:.1f}"
+        elif composite >= 5.5 and emotional >= 5.0:
             rec = "approve"
-            reason = f"Borderline: ⭐{score} score, 💜{niche} niche fit — give it a chance"
+            reason = f"Borderline: composite {composite:.1f} — give it a chance"
         else:
             rec = "reject"
-            reason = f"Low scores: ⭐{score} score, 💜{niche} niche fit — below threshold"
+            reason = f"Low scores: composite {composite:.1f}, emotional {emotional:.1f}"
         products.append({**p, "recommendation": rec, "reason": reason})
 
     to_approve = [p for p in products if p["recommendation"] == "approve"]

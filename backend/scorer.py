@@ -6,28 +6,40 @@ MEDIUM (50-79) -> sent to AI enrichment with lower priority
 LOW (<50) -> dropped before AI
 """
 
+import re
 from typing import Literal
 
 ScoreLabel = Literal["LOW", "MEDIUM", "HIGH"]
 
-# Categories that are a great fit for the couple gift shop
+# Categories well-suited for the couples brand — core and viral-adjacent
 _GOOD_CATEGORIES = {
+    # Core couple/gift categories
     "Jewelry", "Accessories", "Stationery", "Home Fragrance",
     "Phone Accessories", "Phone Cases", "Bags", "Watches",
+    # Viral-adjacent / TikTok-friendly categories
+    "Home Decor", "Home", "Lighting", "Candles", "Clothing",
+    "Beauty", "Plush", "Toys", "Electronics",
 }
 
-# Categories clearly not a fit — penalize hard so they rarely reach AI
+# Categories with essentially zero couple/romantic angle — penalize hard
 _BAD_CATEGORIES = {
-    "Kitchen", "Baby", "Tools", "Automotive", "Sportswear",
-    "Outdoor", "Pet Supplies", "Office", "Industrial", "Food",
+    "Kitchen", "Baby", "Tools", "Automotive",
+    "Outdoor", "Pet Supplies", "Industrial", "Food",
 }
 
-# Title signals that suggest premium materials — reward these
+# Title signals that suggest high perceived value or niche-fit — reward these
 _PREMIUM_SIGNALS = [
+    # Material quality
     "925 silver", "sterling silver", "18k", "14k gold", "gold plated",
-    "gold-plated", "personalized", "personalised", "custom engraved",
-    "engraved", "stainless steel", "zircon", "crystal", "gemstone",
+    "gold-plated", "stainless steel", "zircon", "crystal", "gemstone",
     "titanium", "moissanite", "cubic zirconia",
+    # Personalization (high giftability)
+    "personalized", "personalised", "custom engraved", "engraved", "custom name",
+    # Couple/emotional signals
+    "matching", "couple", "his and hers", "his & hers", "long distance",
+    # TikTok/aesthetic signals
+    "led", "neon", "star projector", "galaxy", "kawaii", "aesthetic",
+    "polaroid", "photo frame", "heart shaped", "heart-shaped",
 ]
 
 # Title signals that suggest low-quality materials — penalize these
@@ -36,6 +48,12 @@ _CHEAP_SIGNALS = [
     "acrylic jewelry", "acrylic jewellery", "resin bracelet",
     "resin necklace", "resin ring", "pvc keychain", "foam",
 ]
+
+# Word-boundary regex for premium signals — avoids false positives from
+# substring matches, e.g. "led" would otherwise match "plated" or "beaded".
+_PREMIUM_PATTERN = re.compile(
+    r"\b(" + "|".join(re.escape(s) for s in _PREMIUM_SIGNALS) + r")\b"
+)
 
 
 def compute_score(product: dict) -> int:
@@ -121,7 +139,7 @@ def compute_score(product: dict) -> int:
     # Premium-material indicators suggest the product genuinely looks high-end.
     if any(sig in title_lower for sig in _CHEAP_SIGNALS):
         points -= 15
-    elif any(sig in title_lower for sig in _PREMIUM_SIGNALS):
+    elif _PREMIUM_PATTERN.search(title_lower):
         points += 10
 
     return min(100, max(0, points))

@@ -203,27 +203,27 @@ class Database:
              has_chinese_text=EXCLUDED.has_chinese_text,
              chinese_text_note=EXCLUDED.chinese_text_note,
              stage=CASE
-               WHEN products.stage IN ('REVIEWED','QUEUED','LIVE') THEN products.stage
+               WHEN products.stage IN ('ENRICHED','EXCEPTION','REVIEWED','QUEUED','LIVE') THEN products.stage
                ELSE EXCLUDED.stage
              END,
              rejection_reason=CASE
-               WHEN products.stage IN ('REVIEWED','QUEUED','LIVE') THEN products.rejection_reason
+               WHEN products.stage IN ('ENRICHED','EXCEPTION','REVIEWED','QUEUED','LIVE') THEN products.rejection_reason
                ELSE EXCLUDED.rejection_reason
              END,
              review_note=CASE
-               WHEN products.stage IN ('REVIEWED','QUEUED','LIVE') THEN products.review_note
+               WHEN products.stage IN ('ENRICHED','EXCEPTION','REVIEWED','QUEUED','LIVE') THEN products.review_note
                ELSE EXCLUDED.review_note
              END,
              approved_at=CASE
-               WHEN products.stage IN ('REVIEWED','QUEUED','LIVE') THEN products.approved_at
+               WHEN products.stage IN ('ENRICHED','EXCEPTION','REVIEWED','QUEUED','LIVE') THEN products.approved_at
                ELSE EXCLUDED.approved_at
              END,
              rejected_at=CASE
-               WHEN products.stage IN ('REVIEWED','QUEUED','LIVE') THEN products.rejected_at
+               WHEN products.stage IN ('ENRICHED','EXCEPTION','REVIEWED','QUEUED','LIVE') THEN products.rejected_at
                ELSE EXCLUDED.rejected_at
              END,
              posted_at=CASE
-               WHEN products.stage IN ('REVIEWED','QUEUED','LIVE') THEN products.posted_at
+               WHEN products.stage IN ('ENRICHED','EXCEPTION','REVIEWED','QUEUED','LIVE') THEN products.posted_at
                ELSE EXCLUDED.posted_at
              END
         """,
@@ -312,6 +312,17 @@ class Database:
             "rejection_reason",
             "audience",
             "instagram_url",
+            # scoring fields — previously missing, causing silent zero-writes
+            "score",
+            "niche_fit",
+            "visual_appeal",
+            "trend_score",
+            "composite_score",
+            "verdict",
+            "product_tier",
+            "confidence",
+            "viral_angle",
+            "emotional_hook",
         }
         updates = {k: v for k, v in (data or {}).items() if k in allowed}
         if "sell_price_eur" in updates:
@@ -702,10 +713,12 @@ class Database:
     async def get_products_compact(self, stage: str, limit: int = 25) -> list:
         """Compact product rows for AI context — fewer fields to reduce token usage."""
         rows = await self.fetch("""
-            SELECT id, title_translated, product_name, category, score, niche_fit,
-                   visual_appeal, keyword, sell_price_eur, margin_pct, orders,
+            SELECT id, title_translated, product_name, category,
+                   score, niche_fit, visual_appeal,
+                   composite_score, verdict, product_tier, confidence,
+                   keyword, sell_price_eur, margin_pct, orders,
                    rejection_reason, stage, images_json
-            FROM products WHERE stage=$1 ORDER BY score DESC NULLS LAST LIMIT $2
+            FROM products WHERE stage=$1 ORDER BY composite_score DESC NULLS LAST LIMIT $2
         """, stage, limit)
         result = []
         for r in rows:
@@ -721,6 +734,10 @@ class Database:
                 "score": float(r["score"] or 0),
                 "niche_fit": float(r["niche_fit"] or 0),
                 "visual_appeal": float(r["visual_appeal"] or 0),
+                "composite_score": float(r["composite_score"] or 0),
+                "verdict": r["verdict"] or "",
+                "product_tier": r["product_tier"] or "",
+                "confidence": float(r["confidence"] or 0),
                 "keyword": r["keyword"],
                 "sell_price_eur": float(r["sell_price_eur"] or 0),
                 "margin_pct": float(r["margin_pct"] or 0),
@@ -733,7 +750,7 @@ class Database:
 
     async def get_stats(self) -> dict:
         stats: dict = {}
-        for stage in ("SCRAPED", "ENRICHED", "TEXT_REMOVAL", "REVIEWED", "LIVE", "REJECTED"):
+        for stage in ("SCRAPED", "ENRICHED", "EXCEPTION", "TEXT_REMOVAL", "REVIEWED", "LIVE", "REJECTED"):
             val = await self.fetchval("SELECT COUNT(*) FROM products WHERE stage=$1", stage)
             stats[stage] = val if val else 0
 

@@ -46,6 +46,18 @@ def profit_filter(product: dict, settings: dict) -> bool:
 
     return margin >= min_margin_req
 
+_CONTENT_REJECTS = [
+    # Plush / stuffed animals / cartoon IP — common on Taobao, zero couple angle
+    "plush", "stuffed animal", "stuffed toy", "plushie",
+    "stitch", "sanrio", "hello kitty", "cinnamoroll", "kuromi", "pompompurin",
+    "pokemon", "pokémon", "pikachu", "eevee",
+    "disney", "mickey", "minnie", "winnie the pooh",
+    "barbie", "snoopy", "care bear",
+    # Food / consumables
+    "supplement", "protein powder", "vitamin", "collagen",
+    "snack gift", "food gift", "coffee gift", "tea gift", "chocolate gift",
+]
+
 _DEMOGRAPHIC_REJECTS = [
     "baby", "infant", "toddler", "newborn", "formula", "diaper",
     "children's", "kids", "age 3", "age 4", "age 5", "age 6",
@@ -112,6 +124,11 @@ def basic_filter(products: list, settings: dict) -> list:
         title_lower = (p.get("title_translated") or p.get("title", "")).lower()
         desc_lower = (p.get("description") or "").lower()
         text = f"{title_lower} {desc_lower}"
+
+        matched_content = next((f for f in _CONTENT_REJECTS if f in text), None)
+        if matched_content:
+            p["_bouncer_reason"] = f"hard_reject: content ({matched_content!r})"
+            continue
 
         matched_demo = next((f for f in _DEMOGRAPHIC_REJECTS if f in text), None)
         if matched_demo:

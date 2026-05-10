@@ -47,8 +47,8 @@ WHEN REVIEWING PENDING/REVIEWED PRODUCTS (most important feature):
 - Return action="review_pending" with:
   - products=[...all pending products with an added "recommendation": "approve"|"reject" and "reason": "..." field]
   - reply: a brief summary like "Reviewed 12 products: 7 approve, 5 reject"
-- APPROVE criteria: verdict in ["top_priority","strong_candidate"] OR composite_score >= 6.5 with emotional_trigger >= 6. Also approve viral-adjacent products (neon signs, star projectors, kawaii, aesthetic decor, matching hoodies, plushies) if they have a clear couple/emotional angle even without a traditional "couple" label.
-- REJECT criteria: verdict="auto_reject" OR composite_score < 5.0, OR product is emotionally empty with no couple angle, Chinese text without note, industrial/B2B items, children's toys for under-12.
+- APPROVE criteria: verdict in ["top_priority","strong_candidate"] OR composite_score >= 7.0 with emotional_trigger >= 6. Also approve viral-adjacent products (neon signs, star projectors, kawaii, aesthetic decor, matching hoodies) if they have a clear couple/emotional angle.
+- REJECT criteria: verdict="auto_reject" OR composite_score < 6.0, OR product is emotionally empty with no couple angle, Chinese text without note, industrial/B2B items, plush toys, children's toys.
 - Keep "reason" under 12 words to save tokens. Return ONLY id, recommendation, reason in the products array.
 
 WHEN SUGGESTING EDITS:
@@ -102,10 +102,10 @@ def _rule_based_review_pending(context: dict) -> dict:
         if verdict == "top_priority" or (composite >= 7.5 and emotional >= 7):
             rec = "approve"
             reason = f"Top pick: composite {composite:.1f}, emotional {emotional:.1f}"
-        elif verdict == "strong_candidate" or composite >= 6.5:
+        elif verdict == "strong_candidate" or composite >= 7.0:
             rec = "approve"
             reason = f"Strong candidate: composite {composite:.1f}, emotional {emotional:.1f}"
-        elif composite >= 5.5 and emotional >= 5.0:
+        elif composite >= 6.0 and emotional >= 5.0:
             rec = "approve"
             reason = f"Borderline: composite {composite:.1f} — give it a chance"
         else:

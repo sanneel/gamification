@@ -1,6 +1,9 @@
 """
 Run CSSBuy scraping locally and upload the scraped data to the hosted website.
 
+Scrapes one keyword at a time, uploads immediately after each keyword finishes,
+then moves to the next. Loops forever with --interval between full cycles.
+
 Required env:
   WEBSITE_URL=https://your-site.example.com
   INGEST_API_TOKEN=your-shared-token
@@ -12,8 +15,8 @@ Optional env:
   MAX_PER_KEYWORD=100
   CSSBUY_SOURCE=1688|taobao|both
   CAPTCHA_2CAPTCHA_KEY=...
-  UPLOAD_BATCH_SIZE=100      (upload products in chunks of this size)
-  SCRAPE_INTERVAL=3600       (seconds between cycles when looping)
+  UPLOAD_BATCH_SIZE=100
+  SCRAPE_INTERVAL=3600
 """
 
 import argparse
@@ -44,24 +47,18 @@ def _csv(value: str) -> list[str]:
 
 
 def _arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Scrape CSSBuy locally and upload products to DropOS.")
-    parser.add_argument("--website-url", default=os.getenv("WEBSITE_URL", ""), help="Hosted DropOS website URL")
-    parser.add_argument("--token", default=os.getenv("INGEST_API_TOKEN", ""), help="Shared ingest API token")
-    parser.add_argument("--keywords", nargs="*", default=None, help="Keywords to scan")
+    parser = argparse.ArgumentParser(description="Scrape CSSBuy and upload per keyword.")
+    parser.add_argument("--website-url", default=os.getenv("WEBSITE_URL", ""))
+    parser.add_argument("--token", default=os.getenv("INGEST_API_TOKEN", ""))
+    parser.add_argument("--keywords", nargs="*", default=None)
     parser.add_argument("--max-per-keyword", type=int, default=int(os.getenv("MAX_PER_KEYWORD", "100")))
     parser.add_argument("--source", default=os.getenv("CSSBUY_SOURCE", "1688"), choices=("1688", "taobao", "both"))
     parser.add_argument("--username", default=os.getenv("CSSBUY_USERNAME", ""))
     parser.add_argument("--password", default=os.getenv("CSSBUY_PASSWORD", ""))
     parser.add_argument("--captcha-key", default=os.getenv("CAPTCHA_2CAPTCHA_KEY", ""))
-    parser.add_argument("--upload-batch", type=int, default=int(os.getenv("UPLOAD_BATCH_SIZE", "100")),
-                        help="Upload products in chunks of this size (default 100)")
+    parser.add_argument("--upload-batch", type=int, default=int(os.getenv("UPLOAD_BATCH_SIZE", "100")))
     parser.add_argument("--interval", type=int, default=int(os.getenv("SCRAPE_INTERVAL", "0")),
-                        help="Loop interval in seconds. 0 = run once and exit (default)")
-    parser.add_argument(
-        "--payload-out",
-        default=os.getenv("LOCAL_SCRAPE_PAYLOAD_OUT", "local_scrape_payload.json"),
-        help="Where to save scraped products before upload",
-    )
+                        help="Seconds between full cycles. 0 = run once.")
     return parser
 
 
@@ -70,18 +67,16 @@ async def _upload(website_url: str, token: str, payload: dict) -> dict:
     async with httpx.AsyncClient(timeout=60) as client:
         response = await client.post(url, json=payload, headers={"Authorization": f"Bearer {token}"})
         if response.status_code >= 400:
-            body = response.text.strip()
-            raise RuntimeError(f"Upload failed: HTTP {response.status_code} from {url}\n{body[:1000]}")
+            raise RuntimeError(f"Upload failed: HTTP {response.status_code}\n{response.text[:500]}")
         return response.json()
 
 
-async def run_once(args, keywords: list) -> int:
-    log.info("Scraping %d keyword(s) from CSSBuy source=%s max=%d",
-             len(keywords), args.source, args.max_per_keyword)
+async def scrape_and_upload_keyword(args, keyword: str, idx: int, total: int) -> int:
+    """Scrape one keyword, upload immediately in chunks. Returns products uploaded."""
+    log.info("[%d/%d] Scraping: %r", idx, total, keyword)
 
-    # One browser session scrapes all keywords in sequence
     products = await scraper_cssbuy.scrape(
-        list(keywords),
+        [keyword],
         args.max_per_keyword,
         username=args.username,
         password=args.password,
@@ -89,42 +84,44 @@ async def run_once(args, keywords: list) -> int:
         source=args.source,
     )
 
-    log.info("Scraped %d product(s) total", len(products))
+    log.info("[%d/%d] Scraped %d products — uploading now", idx, total, len(products))
+
     if not products:
-        return 1
+        log.warning("[%d/%d] No products scraped for %r", idx, total, keyword)
+        return 0
 
-    if args.payload_out:
-        try:
-            Path(args.payload_out).write_text(
-                json.dumps({"keywords": list(keywords), "source": args.source,
-                            "products": products}, ensure_ascii=False),
-                encoding="utf-8",
-            )
-        except Exception as exc:
-            log.warning("Could not save payload: %s", exc)
+    chunks = [products[i:i + args.upload_batch] for i in range(0, len(products), args.upload_batch)]
+    uploaded = 0
 
-    # Upload in chunks of --upload-batch so pipeline starts reviewing immediately
-    batch_size = args.upload_batch
-    chunks = [products[i:i + batch_size] for i in range(0, len(products), batch_size)]
-    total_uploaded = 0
-
-    for idx, chunk in enumerate(chunks, 1):
+    for cidx, chunk in enumerate(chunks, 1):
         try:
             result = await _upload(
                 args.website_url,
                 args.token,
-                {"keywords": list(keywords), "source": args.source, "products": chunk},
+                {"keywords": [keyword], "source": args.source, "products": chunk},
             )
-            job_id   = result.get("job_id", "?")
+            job_id = result.get("job_id", "?")
             accepted = result.get("products", len(chunk))
-            total_uploaded += accepted
-            log.info("Chunk %d/%d → job #%s (%d accepted)", idx, len(chunks), job_id, accepted)
+            uploaded += accepted
+            log.info("  chunk %d/%d → job #%s (%d products accepted)", cidx, len(chunks), job_id, accepted)
         except Exception as exc:
-            log.error("Upload failed chunk %d/%d: %s", idx, len(chunks), exc)
+            log.error("  chunk %d/%d upload failed: %s", cidx, len(chunks), exc)
 
-    log.info("Done — %d/%d products uploaded in %d chunk(s)",
-             total_uploaded, len(products), len(chunks))
-    return 0
+    return uploaded
+
+
+async def run_cycle(args, keywords: list, cycle: int) -> None:
+    log.info("━━━ Cycle #%d — %d keywords ━━━", cycle, len(keywords))
+    total_uploaded = 0
+
+    for idx, keyword in enumerate(keywords, 1):
+        try:
+            uploaded = await scrape_and_upload_keyword(args, keyword, idx, len(keywords))
+            total_uploaded += uploaded
+        except Exception as exc:
+            log.error("[%d/%d] Failed for %r: %s", idx, len(keywords), keyword, exc)
+
+    log.info("━━━ Cycle #%d done — %d products uploaded ━━━", cycle, total_uploaded)
 
 
 async def main(argv: Sequence[str] | None = None) -> int:
@@ -133,38 +130,31 @@ async def main(argv: Sequence[str] | None = None) -> int:
     keywords = args.keywords if args.keywords is not None else env_keywords
 
     missing = []
-    if not args.website_url:
-        missing.append("WEBSITE_URL")
-    if not args.token:
-        missing.append("INGEST_API_TOKEN")
-    if not args.username:
-        missing.append("CSSBUY_USERNAME")
-    if not args.password:
-        missing.append("CSSBUY_PASSWORD")
-    if not keywords:
-        missing.append("SCAN_KEYWORDS or --keywords")
+    if not args.website_url:  missing.append("WEBSITE_URL")
+    if not args.token:        missing.append("INGEST_API_TOKEN")
+    if not args.username:     missing.append("CSSBUY_USERNAME")
+    if not args.password:     missing.append("CSSBUY_PASSWORD")
+    if not keywords:          missing.append("SCAN_KEYWORDS or --keywords")
     if missing:
-        print("Missing required setting(s): " + ", ".join(missing), file=sys.stderr)
+        print("Missing: " + ", ".join(missing), file=sys.stderr)
         return 2
 
-    if args.interval > 0:
-        # Loop mode
-        cycle = 0
-        while True:
-            cycle += 1
-            log.info("━━━ Cycle #%d ━━━", cycle)
-            try:
-                await run_once(args, keywords)
-            except Exception as exc:
-                log.error("Cycle #%d failed: %s", cycle, exc)
-            log.info("Sleeping %ds before next cycle. Ctrl+C to stop.", args.interval)
-            try:
-                await asyncio.sleep(args.interval)
-            except asyncio.CancelledError:
-                break
-    else:
-        # Run once — identical to original script behaviour
-        return await run_once(args, keywords)
+    cycle = 0
+    while True:
+        cycle += 1
+        try:
+            await run_cycle(args, keywords, cycle)
+        except Exception as exc:
+            log.error("Cycle #%d crashed: %s", cycle, exc)
+
+        if args.interval <= 0:
+            break
+
+        log.info("Sleeping %ds before next cycle. Ctrl+C to stop.", args.interval)
+        try:
+            await asyncio.sleep(args.interval)
+        except asyncio.CancelledError:
+            break
 
     return 0
 
@@ -173,5 +163,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(asyncio.run(main()))
     except KeyboardInterrupt:
-        log.info("Stopped by user.")
+        log.info("Stopped.")
         raise SystemExit(0)

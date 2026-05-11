@@ -82,10 +82,12 @@ _BRAND_REJECTS = [
 
 # B2B / bulk-manufacturing signals — "custom print" removed because retail
 # couple gift products (matching hoodies, phone cases) legitimately use it.
+# "factory" alone removed — too broad (catches "factory direct lamp" etc.).
+# "factory price" / "factory outlet" covered by _INDUSTRY_REJECTS instead.
 _SPAM_FRAGMENTS = [
     "oem", "bulk order", "custom logo", "1000pcs",
     "minimum order", "private label",
-    "wholesale", "factory", "supplier", "reseller",
+    "wholesale", "factory direct", "factory outlet", "supplier", "reseller",
     "100pcs", "50pcs", "per lot", "lot of",
 ]
 
@@ -117,8 +119,8 @@ def basic_filter(products: list, settings: dict) -> list:
 
         if platform == "1688":
             orders = int(p.get("orders") or 0)
-            if orders < 5:
-                p["_bouncer_reason"] = f"Bouncer: low orders ({orders})"
+            if orders < 1:
+                p["_bouncer_reason"] = f"Bouncer: zero orders ({orders})"
                 continue
 
         title_lower = (p.get("title_translated") or p.get("title", "")).lower()

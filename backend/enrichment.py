@@ -229,11 +229,11 @@ def _normalize_enrichment(result: dict, product: dict, provider: str) -> dict:
     """
     # Detect new flat schema: any recognised dimension key present as a top-level field
     _NEW_KEYS = {
-        "couple_angle", "couple_score", "couple_appeal", "romantic_score",
+        "couple_angle", "couple_score", "couple_appeal", "cute_appeal", "romantic_score",
         "emotional_trigger", "romantic_trigger", "emotion_score", "emotional_score",
         "visual_score", "visual_appeal", "image_score", "visual",
         "trend_alignment", "trend_fit", "trend_score",
-        "demographic_fit", "audience_fit", "demographic_score",
+        "demographic_fit", "audience_fit", "giftability", "demographic_score",
     }
     new_schema = bool(_NEW_KEYS & result.keys()) or (
         "composite" in result and "composite_score" not in result
@@ -241,16 +241,16 @@ def _normalize_enrichment(result: dict, product: dict, provider: str) -> dict:
 
     if new_schema:
         # ── New flat schema — try every alias Gemini might use ─────────────────
-        couple    = _pick("couple_angle","couple_score","couple_appeal","romantic_score",
-                          src=result)
+        couple    = _pick("couple_angle","couple_score","couple_appeal","cute_appeal",
+                          "romantic_score", src=result)
         emotional = _pick("emotional_trigger","romantic_trigger","emotion_score",
                           "emotional_score","emotional","romantic", src=result)
         visual    = _pick("visual_score","visual_appeal","image_score","visual",
                           src=result)
         trend     = _pick("trend_alignment","trend_fit","trend_score","trend",
                           src=result)
-        demo      = _pick("demographic_fit","audience_fit","demographic_score",
-                          "demographic","audience", src=result)
+        demo      = _pick("demographic_fit","audience_fit","giftability",
+                          "demographic_score","demographic","audience", src=result)
         composite = _pick("composite","composite_score","total_score","score",
                           src=result)
 

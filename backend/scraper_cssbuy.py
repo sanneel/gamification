@@ -56,6 +56,7 @@ async def scrape(
     password: str = "",
     captcha_key: str = "",
     source: Source = "1688",
+    on_keyword_done=None,  # optional async callback(keyword: str, products: list)
 ) -> list:
     if not username or not password:
         log.warning("CSSBuy credentials not set — skipping")
@@ -100,6 +101,11 @@ async def scrape(
             for keyword in keywords:
                 kw = await _search_keyword(page, keyword, max_per_keyword, source)
                 products.extend(kw)
+                if on_keyword_done and kw:
+                    try:
+                        await on_keyword_done(keyword, kw)
+                    except Exception as cb_exc:
+                        log.warning("on_keyword_done callback failed for %r: %s", keyword, cb_exc)
 
             return products
 

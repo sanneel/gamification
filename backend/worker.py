@@ -103,14 +103,27 @@ async def run_worker_loop():
 
                 res = batch_results[i]
 
-                if not res.get("store_match"):
-                    # ── Curator rejection ─────────────────────────────────────
-                    reason = res.get("rejection_reason", "Low visual appeal")
+                verdict     = res.get("verdict", "auto_reject")
+                composite_s = float(res.get("composite_score") or res.get("score") or 0)
+
+                # pending_review products (≥6.0) go to review queue, not hard reject
+                store_match = res.get("store_match") or verdict in (
+                    "top_priority", "strong_candidate", "pending_review"
+                )
+
+                if not store_match:
+                    # ── Hard rejection (auto_reject verdict or composite < 6.0) ─
+                    reason = res.get("rejection_reason", "Score below threshold")
                     await db.update_product_fields(pid, {
-                        "stage": "REJECTED",
+                        "stage":            "REJECTED",
                         "rejection_reason": f"Curator: {reason}",
+                        # save real scores so UI shows why it was rejected
+                        "composite_score":  composite_s,
+                        "verdict":          verdict,
+                        "score":            composite_s,
                     })
-                    log.info("Worker: [REJECT] pid=%d → %s", pid, reason[:80])
+                    log.info("Worker: [REJECT] pid=%d score=%.2f verdict=%s → %s",
+                             pid, composite_s, verdict, reason[:60])
                     continue
 
                 # ── Winner: Deep Enrichment + Supabase Image Upload ───────────

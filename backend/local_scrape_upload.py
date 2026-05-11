@@ -79,59 +79,52 @@ async def run_once(args, keywords: list) -> int:
     log.info("Scraping %d keyword(s) from CSSBuy source=%s max=%d",
              len(keywords), args.source, args.max_per_keyword)
 
-    batch_size  = args.upload_batch
-    all_products: list = []
-    total_uploaded = 0
-    kw_count = [0]  # mutable counter for closure
-
-    async def on_keyword_done(keyword: str, products: list) -> None:
-        """Called by the scraper immediately after each keyword finishes."""
-        nonlocal total_uploaded
-        kw_count[0] += 1
-        log.info("[%d] Keyword %r done — %d products, uploading in chunk(s) of %d",
-                 kw_count[0], keyword, len(products), batch_size)
-        all_products.extend(products)
-
-        chunks = [products[i:i + batch_size] for i in range(0, len(products), batch_size)]
-        for idx, chunk in enumerate(chunks, 1):
-            try:
-                result = await _upload(
-                    args.website_url,
-                    args.token,
-                    {"keywords": [keyword], "source": args.source, "products": chunk},
-                )
-                job_id   = result.get("job_id", "?")
-                accepted = result.get("products", len(chunk))
-                total_uploaded += accepted
-                log.info("  chunk %d/%d → job #%s (%d accepted)", idx, len(chunks), job_id, accepted)
-            except Exception as exc:
-                log.error("  upload failed chunk %d/%d for %r: %s", idx, len(chunks), keyword, exc)
-
-    # One browser session for all keywords — uploads fire per keyword via callback
-    await scraper_cssbuy.scrape(
+    # One browser session scrapes all keywords in sequence
+    products = await scraper_cssbuy.scrape(
         list(keywords),
         args.max_per_keyword,
         username=args.username,
         password=args.password,
         captcha_key=args.captcha_key,
         source=args.source,
-        on_keyword_done=on_keyword_done,
     )
 
-    log.info("Done — %d product(s) scraped, %d uploaded", len(all_products), total_uploaded)
+    log.info("Scraped %d product(s) total", len(products))
+    if not products:
+        return 1
 
-    if args.payload_out and all_products:
+    if args.payload_out:
         try:
             Path(args.payload_out).write_text(
                 json.dumps({"keywords": list(keywords), "source": args.source,
-                            "products": all_products}, ensure_ascii=False),
+                            "products": products}, ensure_ascii=False),
                 encoding="utf-8",
             )
-            log.info("Saved full payload to %s", args.payload_out)
         except Exception as exc:
             log.warning("Could not save payload: %s", exc)
 
-    return 0 if all_products else 1
+    # Upload in chunks of --upload-batch so pipeline starts reviewing immediately
+    batch_size = args.upload_batch
+    chunks = [products[i:i + batch_size] for i in range(0, len(products), batch_size)]
+    total_uploaded = 0
+
+    for idx, chunk in enumerate(chunks, 1):
+        try:
+            result = await _upload(
+                args.website_url,
+                args.token,
+                {"keywords": list(keywords), "source": args.source, "products": chunk},
+            )
+            job_id   = result.get("job_id", "?")
+            accepted = result.get("products", len(chunk))
+            total_uploaded += accepted
+            log.info("Chunk %d/%d → job #%s (%d accepted)", idx, len(chunks), job_id, accepted)
+        except Exception as exc:
+            log.error("Upload failed chunk %d/%d: %s", idx, len(chunks), exc)
+
+    log.info("Done — %d/%d products uploaded in %d chunk(s)",
+             total_uploaded, len(products), len(chunks))
+    return 0
 
 
 async def main(argv: Sequence[str] | None = None) -> int:

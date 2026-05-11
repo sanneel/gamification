@@ -35,6 +35,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 import scraper_cssbuy
 
+UPLOAD_BATCH_SIZE = int(os.getenv("UPLOAD_BATCH_SIZE", "100"))
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -66,6 +68,8 @@ def _arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--username", default=os.getenv("CSSBUY_USERNAME", ""))
     parser.add_argument("--password", default=os.getenv("CSSBUY_PASSWORD", ""))
     parser.add_argument("--captcha-key", default=os.getenv("CAPTCHA_2CAPTCHA_KEY", ""))
+    parser.add_argument("--upload-batch", type=int, default=UPLOAD_BATCH_SIZE,
+                        help="Upload products in chunks of this size (default 100).")
     parser.add_argument("--interval", type=int,
                         default=int(os.getenv("SCRAPE_INTERVAL", "3600")),
                         help="Seconds to wait between full keyword cycles (default 3600).")
@@ -113,6 +117,7 @@ async def _run_cycle(
     captcha_key: str,
     payload_out: str,
     cycle_num: int,
+    upload_batch: int = 100,
 ) -> dict:
     """Run one full cycle: scrape all keywords, upload each immediately."""
     cycle_start = time.time()
@@ -148,14 +153,21 @@ async def _run_cycle(
         total_scraped += len(products)
         all_products.extend(products)
 
-        try:
-            result = await _upload_keyword(website_url, token, keyword, source, products)
-            job_id = result.get("job_id", "?")
-            accepted = result.get("products", len(products))
-            total_uploaded += accepted
-            log.info("  ✓ Uploaded → job #%s (%d products accepted)", job_id, accepted)
-        except Exception as exc:
-            log.error("  Upload failed for %r: %s", keyword, exc)
+        # Upload in chunks of UPLOAD_BATCH_SIZE so the pipeline can start
+        # processing and reviewing the first batch while the rest upload.
+        chunks = [products[i:i + upload_batch]
+                  for i in range(0, len(products), upload_batch)]
+        for chunk_idx, chunk in enumerate(chunks, 1):
+            try:
+                result = await _upload_keyword(website_url, token, keyword, source, chunk)
+                job_id = result.get("job_id", "?")
+                accepted = result.get("products", len(chunk))
+                total_uploaded += accepted
+                log.info("  ✓ Chunk %d/%d → job #%s (%d products)",
+                         chunk_idx, len(chunks), job_id, accepted)
+            except Exception as exc:
+                log.error("  Upload failed for chunk %d/%d of %r: %s",
+                          chunk_idx, len(chunks), keyword, exc)
 
     elapsed_cycle = time.time() - cycle_start
 
@@ -218,6 +230,7 @@ async def main(argv: Sequence[str] | None = None) -> int:
                 captcha_key=args.captcha_key,
                 payload_out=args.payload_out,
                 cycle_num=cycle,
+                upload_batch=args.upload_batch,
             )
         except KeyboardInterrupt:
             break

@@ -199,31 +199,67 @@ def _build_system_text(context_snippet: str | None) -> str:
 
 # ── Shared normalization ───────────────────────────────────────────────────────
 
+def _pick(*keys, src: dict, default: float = 0.0) -> float:
+    """Return first non-zero value found among keys in src, else default."""
+    for k in keys:
+        v = src.get(k)
+        if v is not None:
+            try:
+                f = float(v)
+                if f != 0:
+                    return f
+            except (TypeError, ValueError):
+                pass
+    return default
+
+
 def _normalize_enrichment(result: dict, product: dict, provider: str) -> dict:
     """
     Coerce an AI response into the canonical enrichment schema.
 
-    Handles three input shapes:
-    - New flat schema: couple_angle, emotional_trigger, visual_score, trend_alignment,
-      demographic_fit, composite — produced by the current prompts.
-    - Mid-generation schema: composite_score + scores sub-object.
-    - Legacy schema: niche_fit + visual_appeal + trend_score (old Groq/mock).
+    Handles any field names Gemini might return — uses alias lists so a
+    hallucinated field name (cute_appeal, romantic_trigger, trend_fit, etc.)
+    still resolves to the correct dimension rather than silently returning 0.
+
+    Shapes handled:
+    - New flat schema: couple_angle / emotional_trigger / visual_score /
+      trend_alignment / demographic_fit + composite
+    - Mid-generation schema: composite_score + scores sub-object
+    - Legacy schema: niche_fit + visual_appeal + trend_score
     """
-    new_schema = "couple_angle" in result or (
+    # Detect new flat schema: any recognised dimension key present as a top-level field
+    _NEW_KEYS = {
+        "couple_angle", "couple_score", "couple_appeal", "romantic_score",
+        "emotional_trigger", "romantic_trigger", "emotion_score", "emotional_score",
+        "visual_score", "visual_appeal", "image_score", "visual",
+        "trend_alignment", "trend_fit", "trend_score",
+        "demographic_fit", "audience_fit", "demographic_score",
+    }
+    new_schema = bool(_NEW_KEYS & result.keys()) or (
         "composite" in result and "composite_score" not in result
     )
 
     if new_schema:
-        # ── New flat schema ────────────────────────────────────────────────────
-        couple    = float(result.get("couple_angle", 0))
-        emotional = float(result.get("emotional_trigger", 0))
-        visual    = float(result.get("visual_score", 0))
-        trend     = float(result.get("trend_alignment", 0))
-        demo      = float(result.get("demographic_fit", 0))
-        composite = float(result.get("composite", 0))
-        # Recompute if the AI returned 0 (safety net)
-        if composite == 0 and (couple + emotional + visual + trend + demo) > 0:
-            composite = round(couple*0.30 + emotional*0.25 + visual*0.20 + trend*0.15 + demo*0.10, 2)
+        # ── New flat schema — try every alias Gemini might use ─────────────────
+        couple    = _pick("couple_angle","couple_score","couple_appeal","romantic_score",
+                          src=result)
+        emotional = _pick("emotional_trigger","romantic_trigger","emotion_score",
+                          "emotional_score","emotional","romantic", src=result)
+        visual    = _pick("visual_score","visual_appeal","image_score","visual",
+                          src=result)
+        trend     = _pick("trend_alignment","trend_fit","trend_score","trend",
+                          src=result)
+        demo      = _pick("demographic_fit","audience_fit","demographic_score",
+                          "demographic","audience", src=result)
+        composite = _pick("composite","composite_score","total_score","score",
+                          src=result)
+
+        # Always recompute composite from dimensions — guards against Gemini
+        # returning a composite that doesn't match its own sub-scores
+        if couple + emotional + visual + trend + demo > 0:
+            composite = round(couple*0.30 + emotional*0.25 + visual*0.20
+                              + trend*0.15 + demo*0.10, 2)
+
         result["composite_score"] = composite
         result["scores"] = {
             "couple_angle":      round(couple, 1),
@@ -232,6 +268,16 @@ def _normalize_enrichment(result: dict, product: dict, provider: str) -> dict:
             "trend_alignment":   round(trend, 1),
             "demographic_fit":   round(demo, 1),
         }
+
+        if composite == 0:
+            log.warning(
+                "normalize: all dimensions zero for provider=%s product=%s — "
+                "Gemini may have returned unexpected field names. Raw keys: %s",
+                provider,
+                (product.get("title_translated") or product.get("title", "?"))[:40],
+                list(result.keys()),
+            )
+
     else:
         # ── Legacy / mid-generation schema ────────────────────────────────────
         if "composite_score" not in result:
@@ -258,7 +304,8 @@ def _normalize_enrichment(result: dict, product: dict, provider: str) -> dict:
 
     composite = float(result.get("composite_score", 0))
     if new_schema:
-        emotional = float(result.get("emotional_trigger", 0))
+        emotional = _pick("emotional_trigger","romantic_trigger","emotion_score",
+                          "emotional_score", src=result)
 
     # ── Derive verdict ─────────────────────────────────────────────────────────
     if "verdict" not in result:

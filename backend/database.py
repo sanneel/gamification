@@ -1012,7 +1012,7 @@ async def init_db():
                     created_at        TEXT,
                     audience          TEXT DEFAULT '',
                     instagram_url     TEXT DEFAULT '',
-                    CHECK (stage IN ('SCRAPED', 'ENRICHED', 'REVIEWED', 'QUEUED', 'LIVE', 'REJECTED'))
+                    CHECK (stage IN ('SCRAPED', 'ENRICHED', 'TEXT_REMOVAL', 'REVIEWED', 'QUEUED', 'LIVE', 'REJECTED', 'EXCEPTION'))
                 )
             """)
 
@@ -1032,6 +1032,17 @@ async def init_db():
                     await conn.execute(f"ALTER TABLE products ADD COLUMN IF NOT EXISTS {col} {definition}")
                 except Exception:
                     pass
+
+            try:
+                await conn.execute("ALTER TABLE products DROP CONSTRAINT IF EXISTS products_stage_check")
+                await conn.execute("""
+                    ALTER TABLE products
+                    ADD CONSTRAINT products_stage_check
+                    CHECK (stage IN ('SCRAPED', 'ENRICHED', 'TEXT_REMOVAL', 'REVIEWED', 'QUEUED', 'LIVE', 'REJECTED', 'EXCEPTION'))
+                    NOT VALID
+                """)
+            except Exception as exc:
+                log.warning("Could not refresh products stage check constraint: %s", exc)
 
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS jobs (

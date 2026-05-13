@@ -711,16 +711,55 @@ async def ai_enrich_batch(products: list[dict], settings: dict, context_snippet:
     b64_collage = base64.b64encode(collage_bytes).decode()
     
     products_text = "\n".join([
-        f"Prod {i+1}: {p.get('title_translated') or p.get('title')[:60]} (₾{p.get('cost_eur')})"
+        f"Product {i + 1}: {(p.get('title_translated') or p.get('title') or '')[:80]} "
+        f"(sell price: {p.get('sell_price_eur', '?')}, orders: {p.get('orders', 0)})"
         for i, p in enumerate(products)
     ])
 
+    batch_system = (
+        _build_system_text(context_snippet)
+        + """
+
+BATCH MODE:
+You are evaluating multiple products from one collage. Return exactly one JSON
+object with a "results" array. The array must contain one object for each listed
+product, in the same order, using product_index values 1 through N.
+
+Required shape:
+{
+  "results": [
+    {
+      "product_index": 1,
+      "couple_angle": 0-10,
+      "emotional_trigger": 0-10,
+      "visual_score": 0-10,
+      "trend_alignment": 0-10,
+      "demographic_fit": 0-10,
+      "composite": 0-10,
+      "verdict": "top_priority|strong_candidate|pending_review|auto_reject",
+      "product_tier": "core_couple|viral_adjacent|sentimental|lifestyle|auto_reject",
+      "confidence": 0.0-1.0,
+      "store_match": true|false,
+      "viral_angle": "one sentence or null",
+      "emotional_hook": "one sentence or null",
+      "rejection_reason": "string or null",
+      "product_name": "Georgian 3-5 words if store_match=true else empty string",
+      "caption": "Georgian 2-3 sentences if store_match=true else empty string",
+      "hashtags": []
+    }
+  ]
+}
+
+Do not return a single product object. Do not omit product_index.
+"""
+    )
+
     payload = {
-        "system_instruction": {"parts": [{"text": _build_system_text(context_snippet)}]},
+        "system_instruction": {"parts": [{"text": batch_system}]},
         "contents": [{
             "parts": [
                 {"inline_data": {"mime_type": "image/jpeg", "data": b64_collage}},
-                {"text": f"Evaluate these 6 products:\n{products_text}"}
+                {"text": f"Evaluate exactly {len(products)} products:\n{products_text}"}
             ]
         }],
         "generationConfig": {
@@ -745,11 +784,34 @@ async def ai_enrich_batch(products: list[dict], settings: dict, context_snippet:
         data = resp.json()
         text = data["candidates"][0]["content"]["parts"][0]["text"]
         text = re.sub(r"```json|```", "", text).strip()
-        results_list = json.loads(text).get("results", [])
+        parsed = json.loads(text)
+        results_list = parsed.get("results")
+        if not isinstance(results_list, list):
+            if len(products) == 1 and isinstance(parsed, dict):
+                results_list = [{**parsed, "product_index": 1}]
+            else:
+                log.warning(
+                    "Batch Gemini returned unexpected JSON shape; falling back to individual enrichment. Keys: %s",
+                    list(parsed.keys()) if isinstance(parsed, dict) else type(parsed).__name__,
+                )
+                return [await ai_enrich(p, settings, context_snippet) for p in products]
 
         enriched_results = []
         for i, p in enumerate(products):
-            res = next((r for r in results_list if r.get("product_index") == i + 1), {})
+            res = next(
+                (
+                    r for r in results_list
+                    if isinstance(r, dict) and str(r.get("product_index")) == str(i + 1)
+                ),
+                None,
+            )
+            if res is None:
+                log.warning(
+                    "Batch Gemini omitted product_index=%d; falling back to individual enrichment for that product",
+                    i + 1,
+                )
+                enriched_results.append(await ai_enrich(p, settings, context_snippet))
+                continue
             enriched_results.append(_normalize_enrichment(res, p, "gemini-batch"))
 
         return enriched_results

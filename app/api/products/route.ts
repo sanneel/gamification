@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   const supabase = getSupabaseAdmin();
   let query = supabase
     .from("products")
-    .select("id,name,price,image,category,gender_target,is_active")
+    .select("id,name,descriptor,price,image,category,gender_target,tag,best_for,is_active")
     .eq("is_active", true)
     .order("category", { ascending: true })
     .order("price", { ascending: true });

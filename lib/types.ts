@@ -6,10 +6,13 @@ export type OrderStatus = "paid" | "pending" | "failed";
 export type Product = {
   id: string;
   name: string;
+  descriptor?: string | null;
   price: number;
   image: string;
   category: ProductCategory;
   gender_target: GenderTarget;
+  tag?: string | null;
+  best_for?: string | null;
   is_active: boolean;
 };
 

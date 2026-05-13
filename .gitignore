@@ -5,6 +5,8 @@ __pycache__/
 .backend.pid
 .env
 node_modules/
+.next/
+tsconfig.tsbuildinfo
 .DS_Store
 
 # Session/cookie exports — contain live credentials, never commit

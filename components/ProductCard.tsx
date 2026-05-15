@@ -3,9 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
-import { Check, ShoppingCart, Sparkles, Zap } from "lucide-react";
-import { type Product, formatGELSimple, savingsPct } from "@/lib/types";
+import { useState, useCallback } from "react";
+import { Check, Eye, Heart, Sparkles, Star, X } from "lucide-react";
+import { type Product, formatGELSimple, savingsPct, savings } from "@/lib/types";
+import { springs, ease } from "@/lib/motion";
 
 interface ProductCardProps {
   product: Product;
@@ -14,209 +15,354 @@ interface ProductCardProps {
   showBoxAction?: boolean;
 }
 
-export default function ProductCard({
-  product,
-  onAddToBox,
-  isInBox = false,
-  showBoxAction = true,
-}: ProductCardProps) {
+// ─── Quick Preview Modal ──────────────────────────────────────────────────────
+
+function QuickPreviewModal({
+  product, onClose, onAddToBox, isInBox,
+}: {
+  product: Product;
+  onClose: () => void;
+  onAddToBox?: (p: Product) => void;
+  isInBox: boolean;
+}) {
+  const [activeImg, setActiveImg] = useState(0);
+  const [added, setAdded] = useState(false);
+  const pct = savingsPct(product);
+  const saved = savings(product);
+
+  function handleAdd(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (isInBox || !onAddToBox) return;
+    onAddToBox(product);
+    setAdded(true);
+    setTimeout(() => { setAdded(false); onClose(); }, 1400);
+  }
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.25 }}
+      onClick={onClose}
+    >
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+
+      {/* Modal */}
+      <motion.div
+        className="relative z-10 w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl overflow-hidden"
+        style={{ background: "linear-gradient(160deg, #1a1a2e 0%, #0d0d0d 100%)", border: "1px solid rgba(255,255,255,0.08)" }}
+        initial={{ y: "100%", opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: "100%", opacity: 0 }}
+        transition={{ ...springs.gentle, duration: 0.4 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Handle (mobile) */}
+        <div className="sm:hidden w-10 h-1 bg-white/20 rounded-full mx-auto mt-3 mb-1" />
+
+        {/* Close */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-20 w-8 h-8 glass rounded-full border border-white/10 flex items-center justify-center hover:bg-white/15 transition-all"
+        >
+          <X className="w-4 h-4 text-white" />
+        </button>
+
+        <div className="flex flex-col sm:flex-row gap-0">
+          {/* Image */}
+          <div className="relative w-full sm:w-52 aspect-square sm:aspect-auto sm:h-auto shrink-0">
+            <AnimatePresence mode="wait">
+              <motion.div key={activeImg} className="absolute inset-0"
+                initial={{ opacity: 0, scale: 1.06 }} animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4, ease: ease.expo }}>
+                <Image src={product.images[activeImg] ?? product.images[0]} alt={product.title} fill className="object-cover" />
+              </motion.div>
+            </AnimatePresence>
+            {product.images.length > 1 && (
+              <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 z-10">
+                {product.images.map((_, i) => (
+                  <button key={i} onClick={() => setActiveImg(i)}
+                    className={`rounded-full transition-all ${i === activeImg ? "w-4 h-1.5 bg-white" : "w-1.5 h-1.5 bg-white/40"}`}
+                  />
+                ))}
+              </div>
+            )}
+            {pct >= 5 && (
+              <div className="absolute top-3 left-3 text-white text-[10px] font-black px-2.5 py-1 rounded-full"
+                style={{ background: "linear-gradient(135deg, #FF2D78, #7C3AED)" }}>
+                -{pct}%
+              </div>
+            )}
+          </div>
+
+          {/* Info */}
+          <div className="flex-1 p-5 flex flex-col gap-3">
+            {/* Vibes */}
+            <div className="flex gap-1.5 flex-wrap">
+              {product.vibes.slice(0, 2).map((v) => (
+                <span key={v} className="text-[10px] font-bold uppercase tracking-wider text-violet-2 bg-violet/10 px-2 py-0.5 rounded-full">{v}</span>
+              ))}
+            </div>
+
+            <h3 className="font-display text-xl font-bold text-white leading-tight">{product.title}</h3>
+            <p className="text-white/45 text-sm leading-relaxed line-clamp-3">{product.description}</p>
+
+            {/* Stars */}
+            <div className="flex items-center gap-2">
+              <div className="flex">{[1,2,3,4,5].map((s) => <Star key={s} className="w-3 h-3 fill-gold text-gold" />)}</div>
+              <span className="text-white/35 text-xs">4.9 · {Math.floor(Math.random() * 300 + 100)} reviews</span>
+            </div>
+
+            {/* Pricing */}
+            <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(255,45,120,0.15)" }}>
+              <div className="px-4 py-2.5 border-b border-white/5 flex items-center justify-between">
+                <span className="text-white/25 text-xs">Normal</span>
+                <span className="text-white/35 text-sm line-through font-bold">{formatGELSimple(product.normalPrice)}</span>
+              </div>
+              <div className="px-4 py-3 flex items-center justify-between" style={{ background: "rgba(255,45,120,0.07)" }}>
+                <div>
+                  <span className="box-price-badge text-[10px] flex items-center gap-1 mb-1"><Sparkles className="w-2 h-2" /> Box Price</span>
+                  <span className="text-white font-black text-lg">{formatGELSimple(product.boxPrice)}</span>
+                </div>
+                <span className="text-accent text-xs font-bold">Save {formatGELSimple(saved)}</span>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 mt-auto pt-1">
+              <motion.button
+                onClick={handleAdd}
+                disabled={isInBox}
+                className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${
+                  added || isInBox ? "bg-emerald/15 border border-emerald/40 text-emerald" : "btn-dopamine"
+                }`}
+                whileHover={{ scale: isInBox ? 1 : 1.03 }}
+                whileTap={{ scale: isInBox ? 1 : 0.96 }}
+              >
+                <AnimatePresence mode="wait">
+                  {added || isInBox ? (
+                    <motion.span key="added" className="flex items-center gap-2"
+                      initial={{ scale: 0.7 }} animate={{ scale: 1 }} transition={springs.bouncy}>
+                      <Check className="w-3.5 h-3.5" /> Added!
+                    </motion.span>
+                  ) : (
+                    <motion.span key="add" className="flex items-center gap-2"
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                      <Sparkles className="w-3.5 h-3.5" /> Add to Box
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </motion.button>
+              <Link href={`/shop/${product.id}`}
+                className="px-4 py-3 rounded-xl border border-white/10 text-white/50 hover:text-white hover:border-white/25 transition-all text-xs font-bold flex items-center justify-center">
+                View →
+              </Link>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ─── Card ─────────────────────────────────────────────────────────────────────
+
+export default function ProductCard({ product, onAddToBox, isInBox = false, showBoxAction = true }: ProductCardProps) {
   const [hovered, setHovered] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
+  const [liked, setLiked] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+
   const pct = savingsPct(product);
   const primaryImage = product.images[0] ?? "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=600&q=80";
   const secondImage = product.images[1] ?? primaryImage;
 
-  function handleAddToBox(e: React.MouseEvent) {
+  const handleAddToBox = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (isInBox || !onAddToBox) return;
     onAddToBox(product);
     setJustAdded(true);
-    setTimeout(() => setJustAdded(false), 2000);
-  }
+    setTimeout(() => setJustAdded(false), 2200);
+  }, [isInBox, onAddToBox, product]);
 
   return (
-    <motion.div
-      className="group relative product-card"
-      onHoverStart={() => setHovered(true)}
-      onHoverEnd={() => setHovered(false)}
-      initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-    >
-      <Link href={`/shop/${product.id}`} className="block">
-        {/* Image container */}
-        <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-card mb-4">
-          {/* Primary image */}
-          <Image
-            src={primaryImage}
-            alt={product.title}
-            fill
-            className={`object-cover transition-all duration-700 ${hovered ? "opacity-0 scale-105" : "opacity-100 scale-100"}`}
-            sizes="(min-width: 1280px) 300px, (min-width: 768px) 50vw, 100vw"
+    <>
+      <AnimatePresence>
+        {showPreview && (
+          <QuickPreviewModal
+            product={product}
+            onClose={() => setShowPreview(false)}
+            onAddToBox={onAddToBox ? (p) => { onAddToBox(p); setJustAdded(true); setTimeout(() => setJustAdded(false), 2200); } : undefined}
+            isInBox={isInBox}
           />
-          {/* Secondary image on hover */}
-          <Image
-            src={secondImage}
-            alt={product.title}
-            fill
-            className={`object-cover transition-all duration-700 ${hovered ? "opacity-100 scale-110" : "opacity-0 scale-100"}`}
-            sizes="(min-width: 1280px) 300px, (min-width: 768px) 50vw, 100vw"
-          />
+        )}
+      </AnimatePresence>
 
-          {/* Gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      <motion.div
+        className="group relative"
+        onHoverStart={() => setHovered(true)}
+        onHoverEnd={() => setHovered(false)}
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        whileHover={{ y: -4 }}
+        transition={{ duration: 0.45, ease: ease.expo }}
+      >
+        <Link href={`/shop/${product.id}`} className="block">
+          {/* Image container */}
+          <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-card mb-3.5">
+            <Image src={primaryImage} alt={product.title} fill
+              className={`object-cover transition-all duration-700 ${hovered ? "opacity-0 scale-108" : "opacity-100 scale-100"}`}
+              sizes="(min-width: 1280px) 300px, (min-width: 768px) 50vw, 100vw"
+            />
+            <Image src={secondImage} alt={product.title} fill
+              className={`object-cover transition-all duration-700 ${hovered ? "opacity-100 scale-112" : "opacity-0 scale-100"}`}
+              sizes="(min-width: 1280px) 300px, (min-width: 768px) 50vw, 100vw"
+            />
 
-          {/* Savings badge */}
-          {pct >= 5 && (
-            <motion.div
-              className="absolute top-3 left-3"
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", bounce: 0.5 }}
-            >
-              <span className="bg-accent text-white text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-full">
-                -{pct}%
+            {/* Gradient overlay on hover */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-350" />
+
+            {/* Savings badge */}
+            {pct >= 5 && (
+              <motion.div
+                className="absolute top-3 left-3"
+                initial={{ scale: 0, rotate: -12 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={springs.bouncy}
+              >
+                <span className="text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-full"
+                  style={{ background: "linear-gradient(135deg, #FF2D78, #C026D3)" }}>
+                  -{pct}%
+                </span>
+              </motion.div>
+            )}
+
+            {/* Category badge */}
+            <div className="absolute top-3 right-3">
+              <span className="glass text-white/70 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-white/10">
+                {categoryLabel(product.category)}
               </span>
-            </motion.div>
-          )}
+            </div>
 
-          {/* Category badge */}
-          <div className="absolute top-3 right-3">
-            <span className="glass text-white/80 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-white/10">
-              {categoryLabel(product.category)}
-            </span>
+            {/* Action buttons on hover */}
+            <motion.div
+              className="absolute top-12 right-3 flex flex-col gap-2"
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: hovered ? 1 : 0, x: hovered ? 0 : 8 }}
+              transition={{ duration: 0.2 }}
+            >
+              {/* Wishlist */}
+              <motion.button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLiked((v) => !v); }}
+                className="w-8 h-8 glass rounded-full border border-white/10 flex items-center justify-center hover:border-accent/50 transition-all"
+                whileHover={{ scale: 1.12 }}
+                whileTap={{ scale: 0.88 }}
+              >
+                <Heart className={`w-3.5 h-3.5 transition-colors ${liked ? "fill-accent text-accent" : "text-white/50"}`} />
+              </motion.button>
+
+              {/* Quick preview */}
+              <motion.button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowPreview(true); }}
+                className="w-8 h-8 glass rounded-full border border-white/10 flex items-center justify-center hover:border-white/30 transition-all"
+                whileHover={{ scale: 1.12 }}
+                whileTap={{ scale: 0.88 }}
+              >
+                <Eye className="w-3.5 h-3.5 text-white/50" />
+              </motion.button>
+            </motion.div>
+
+            {/* Add to Box CTA */}
+            {showBoxAction && (
+              <motion.div
+                className="absolute bottom-0 left-0 right-0 p-3"
+                initial={{ y: 16, opacity: 0 }}
+                animate={{ y: hovered ? 0 : 16, opacity: hovered ? 1 : 0 }}
+                transition={{ duration: 0.22 }}
+              >
+                <button
+                  onClick={handleAddToBox}
+                  disabled={isInBox || !product.active || product.stock < 1}
+                  className={`w-full py-3 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${
+                    isInBox
+                      ? "bg-emerald/20 text-emerald border border-emerald/30 cursor-default"
+                      : "btn-dopamine"
+                  }`}
+                >
+                  <AnimatePresence mode="wait">
+                    {justAdded || isInBox ? (
+                      <motion.span key="added" className="flex items-center gap-2"
+                        initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.7, opacity: 0 }} transition={springs.bouncy}>
+                        <Check className="w-3.5 h-3.5" /> Added to Box
+                      </motion.span>
+                    ) : (
+                      <motion.span key="add" className="flex items-center gap-2"
+                        initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+                        <Sparkles className="w-3.5 h-3.5" />
+                        Add to Box — {formatGELSimple(product.boxPrice)}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </button>
+              </motion.div>
+            )}
+
+            {/* Stock warning dot */}
+            {product.active && product.stock > 0 && product.stock <= 4 && (
+              <div className="absolute bottom-14 left-3 flex items-center gap-1.5">
+                <motion.div className="w-1.5 h-1.5 rounded-full bg-gold" animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1, repeat: Infinity }} />
+                <span className="text-gold text-[10px] font-bold">Only {product.stock} left</span>
+              </div>
+            )}
+
+            {/* Out of stock */}
+            {(!product.active || product.stock < 1) && (
+              <div className="absolute inset-0 bg-black/65 flex items-center justify-center rounded-2xl">
+                <span className="glass text-white/60 text-xs font-bold uppercase tracking-widest px-4 py-2 rounded-full">Out of Stock</span>
+              </div>
+            )}
           </div>
 
-          {/* Add to Box CTA — visible on hover */}
-          {showBoxAction && (
-            <motion.div
-              className="absolute bottom-0 left-0 right-0 p-3"
-              initial={{ y: 16, opacity: 0 }}
-              animate={{ y: hovered ? 0 : 16, opacity: hovered ? 1 : 0 }}
-              transition={{ duration: 0.25 }}
-            >
-              <button
-                onClick={handleAddToBox}
-                disabled={isInBox || !product.active || product.stock < 1}
-                className={`w-full py-3 rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${
-                  isInBox
-                    ? "bg-emerald/20 text-emerald border border-emerald/30 cursor-default"
-                    : "btn-dopamine"
-                }`}
-              >
-                <AnimatePresence mode="wait">
-                  {justAdded || isInBox ? (
-                    <motion.span
-                      key="added"
-                      className="flex items-center gap-2"
-                      initial={{ scale: 0.8, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 0.8, opacity: 0 }}
-                    >
-                      <Check className="w-4 h-4" />
-                      Added to Box
-                    </motion.span>
-                  ) : (
-                    <motion.span
-                      key="add"
-                      className="flex items-center gap-2"
-                      initial={{ scale: 0.8, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 0.8, opacity: 0 }}
-                    >
-                      <Sparkles className="w-4 h-4" />
-                      Add to Box — {formatGELSimple(product.boxPrice)}
-                    </motion.span>
-                  )}
-                </AnimatePresence>
-              </button>
-            </motion.div>
-          )}
+          {/* Info */}
+          <div className="space-y-1.5 px-0.5">
+            {product.vibes.length > 0 && (
+              <div className="flex gap-1.5 flex-wrap">
+                {product.vibes.slice(0, 2).map((v) => (
+                  <span key={v} className="text-[10px] font-bold uppercase tracking-wider text-violet-2 bg-violet/10 px-2 py-0.5 rounded-full">{v}</span>
+                ))}
+              </div>
+            )}
 
-          {/* Out of stock overlay */}
-          {(!product.active || product.stock < 1) && (
-            <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-2xl">
-              <span className="glass text-white/70 text-xs font-bold uppercase tracking-widest px-4 py-2 rounded-full">
-                Out of Stock
-              </span>
-            </div>
-          )}
-        </div>
+            <h3 className="font-bold text-white text-sm leading-tight group-hover:text-accent transition-colors duration-200">
+              {product.title}
+            </h3>
 
-        {/* Info */}
-        <div className="space-y-2">
-          {/* Tags / vibes */}
-          {product.vibes.length > 0 && (
-            <div className="flex gap-1.5 flex-wrap">
-              {product.vibes.slice(0, 2).map((v) => (
-                <span key={v} className="text-[10px] font-bold uppercase tracking-wider text-violet-2 bg-violet/10 px-2 py-0.5 rounded-full">
-                  {v}
-                </span>
-              ))}
-            </div>
-          )}
-
-          <h3 className="font-bold text-white text-base leading-tight group-hover:text-accent transition-colors duration-200">
-            {product.title}
-          </h3>
-
-          {product.description && (
-            <p className="text-white/40 text-xs leading-relaxed line-clamp-2">
-              {product.description}
-            </p>
-          )}
-
-          {/* Pricing block */}
-          <div className="pt-1">
-            <div className="flex items-end justify-between">
+            <div className="flex items-center justify-between pt-1">
               <div>
-                {/* Normal price — struck through */}
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-white/30 text-xs line-through">
-                    {formatGELSimple(product.normalPrice)}
-                  </span>
-                  <span className="text-white/30 text-[10px]">normal</span>
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <span className="text-white/25 text-xs line-through">{formatGELSimple(product.normalPrice)}</span>
                 </div>
-                {/* Box price — highlighted */}
                 <div className="flex items-center gap-2">
-                  <span className="text-white font-black text-xl">
-                    {formatGELSimple(product.boxPrice)}
-                  </span>
-                  <span className="box-price-badge">
-                    <Sparkles className="w-2.5 h-2.5" />
-                    Box
-                  </span>
+                  <span className="text-white font-black text-base">{formatGELSimple(product.boxPrice)}</span>
+                  <span className="box-price-badge text-[9px] px-2 py-0.5"><Sparkles className="w-2 h-2" /> Box</span>
                 </div>
               </div>
-
-              {/* Quick buy */}
-              <motion.button
-                onClick={(e) => {
-                  e.preventDefault();
-                  // Navigate to product page for individual purchase
-                  window.location.href = `/shop/${product.id}?buy=normal`;
-                }}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                className="w-10 h-10 glass rounded-xl flex items-center justify-center border border-white/10 hover:border-white/30 transition-colors"
-              >
-                <ShoppingCart className="w-4 h-4 text-white/60" />
-              </motion.button>
             </div>
           </div>
-        </div>
-      </Link>
-    </motion.div>
+        </Link>
+      </motion.div>
+    </>
   );
 }
 
 function categoryLabel(cat: Product["category"]): string {
   const labels: Record<Product["category"], string> = {
-    main_surprise: "Main",
-    sweet_pick:    "Sweet",
-    tiny_extra:    "Tiny",
-    lucky_bonus:   "Lucky",
+    main_surprise: "Main", sweet_pick: "Sweet", tiny_extra: "Tiny", lucky_bonus: "Lucky",
   };
   return labels[cat] ?? cat;
 }

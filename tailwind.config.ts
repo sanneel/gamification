@@ -30,12 +30,22 @@ const config: Config = {
         // Green — success
         emerald:    "#10B981",
 
-        // Legacy warm palette (used in hero/homepage)
+        // Warm partner gifting palette (homepage)
         cream:      "#FAF5EE",
         espresso:   "#3A241D",
         oxblood:    "#8B1A1A",
         paper:      "#FDF8F2",
         blush:      "#EFC9C5",
+        "warm-bg":      "#FBF8F4",
+        "warm-surface": "#F5EFE8",
+        "warm-card":    "#FDFAF7",
+        "warm-border":  "#EDE6DC",
+        "warm-rose":    "#C8445C",
+        "warm-rose-2":  "#E8607A",
+        "warm-rose-lt": "#FBDDE2",
+        "warm-muted":   "#9C8278",
+        "warm-text":    "#1C1410",
+        "warm-sub":     "#5C4038",
       },
       fontFamily: {
         sans:    ["var(--font-sans)", "system-ui", "sans-serif"],

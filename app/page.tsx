@@ -2,589 +2,680 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { motion, useScroll, useTransform, useSpring, AnimatePresence } from "framer-motion";
-import { ArrowRight, Gift, Sparkles, Star, Zap, Brain } from "lucide-react";
+import { motion, AnimatePresence, useInView } from "framer-motion";
+import { ArrowRight, Gift, Heart, Sparkles, Star, ChevronRight, ChevronLeft } from "lucide-react";
 import { useRef, useState, useEffect } from "react";
-import ActivityFeed from "@/components/ActivityFeed";
-import { fadeUp, stagger, viewport, springs, ease } from "@/lib/motion";
+import { springs, ease } from "@/lib/motion";
 
-// ── Data ──────────────────────────────────────────────────────────────────────
+// ─── Data ────────────────────────────────────────────────────────────────────
 
-const stats = [
-  { label: "Boxes Sent",     value: "12,400+" },
-  { label: "Happy Recipients", value: "9,800+" },
-  { label: "Spin Rewards",   value: "7,200+"  },
-  { label: "Avg. Savings",   value: "22%"     },
+const OCCASIONS = [
+  { label: "Anniversary", emoji: "💍" },
+  { label: "Birthday", emoji: "🎂" },
+  { label: "Just Because", emoji: "💌" },
+  { label: "Valentine's", emoji: "🌹" },
+  { label: "Long Distance", emoji: "✈️" },
+  { label: "Apology", emoji: "🤍" },
 ];
 
-const vibeCards = [
-  { vibe: "romantic", label: "Romantic", emoji: "🌹", color: "from-rose-700 to-pink-900", glow: "rgba(244,63,94,0.4)", img: "https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=600&q=80" },
-  { vibe: "luxury",   label: "Luxury",   emoji: "💎", color: "from-amber-700 to-yellow-900", glow: "rgba(217,119,6,0.4)", img: "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=600&q=80" },
-  { vibe: "cozy",     label: "Cozy",     emoji: "🕯️", color: "from-orange-700 to-amber-900", glow: "rgba(234,88,12,0.4)", img: "https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=600&q=80" },
-  { vibe: "aesthetic",label: "Aesthetic",emoji: "🎨", color: "from-violet-700 to-purple-900", glow: "rgba(124,58,237,0.4)", img: "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=600&q=80" },
+const FEATURED_BOXES = [
+  {
+    id: "romantic-box",
+    name: "Romantic Evening Box",
+    tagline: "For a night she won't forget",
+    price: "89 ₾",
+    originalPrice: "120 ₾",
+    image: "https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=600&q=80",
+    tags: ["For Her", "Anniversary"],
+    badge: "Best Seller",
+  },
+  {
+    id: "cozy-night",
+    name: "Cozy Night In Box",
+    tagline: "Candles, chocolates & warmth",
+    price: "65 ₾",
+    originalPrice: "90 ₾",
+    image: "https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=600&q=80",
+    tags: ["For Her", "Birthday"],
+    badge: "New",
+  },
+  {
+    id: "adventure-box",
+    name: "His Adventure Kit",
+    tagline: "For the guy who has everything",
+    price: "75 ₾",
+    originalPrice: "105 ₾",
+    image: "https://images.unsplash.com/photo-1549007994-cb92caebd54b?auto=format&fit=crop&w=600&q=80",
+    tags: ["For Him", "Birthday"],
+    badge: null,
+  },
+  {
+    id: "memory-box",
+    name: "Memory Lane Box",
+    tagline: "A love letter you can open",
+    price: "95 ₾",
+    originalPrice: "130 ₾",
+    image: "https://images.unsplash.com/photo-1549388604-817d15aa0110?auto=format&fit=crop&w=600&q=80",
+    tags: ["For Both", "Anniversary"],
+    badge: "Fan Favourite",
+  },
 ];
 
-const howItWorks = [
-  { step: "01", icon: "🎯", title: "Find the vibe",    desc: "Answer 5 quick questions. We'll match products to your person's energy." },
-  { step: "02", icon: "📦", title: "Build the box",   desc: "Main Surprise, Sweet Pick, Tiny Extra — all at exclusive box prices." },
-  { step: "03", icon: "🎡", title: "Spin for a reward", desc: "Free shipping, upgrades, secret items. Server-generated — zero tricks." },
-  { step: "04", icon: "✨", title: "They open it live", desc: "Cinematic unboxing moment, made to be shared on TikTok and Instagram." },
+const TESTIMONIALS = [
+  {
+    text: "My girlfriend cried happy tears. The note I wrote was printed beautifully inside. Easiest gift I've ever given.",
+    name: "Giorgi T.",
+    city: "Tbilisi",
+    emoji: "💌",
+  },
+  {
+    text: "I had no idea what to get for our anniversary. Gamif helped me pick the perfect box in 5 minutes. She loved it.",
+    name: "Luka M.",
+    city: "Batumi",
+    emoji: "💍",
+  },
+  {
+    text: "I live in Germany and wanted to send something real to my boyfriend in Tbilisi. This was perfect.",
+    name: "Mariam D.",
+    city: "Berlin → Tbilisi",
+    emoji: "✈️",
+  },
 ];
 
-const testimonials = [
-  { quote: "She literally screamed when she saw the box. The lucky spin gave free shipping AND an upgrade. Total dopamine hit.", name: "Giorgi M.", location: "Tbilisi", tag: "Anniversary" },
-  { quote: "I've never seen a gift land so perfectly. The vibe quiz was spooky accurate — she cried happy tears.", name: "Ana K.", location: "Kutaisi", tag: "Birthday" },
-  { quote: "Used it for our anniversary. The Lucky Spin unlocked a secret item. We still talk about it.", name: "Luka T.", location: "Batumi", tag: "Couples" },
+const FOR_WHO = [
+  {
+    label: "For Her",
+    description: "Romantic, beautiful, and thoughtful",
+    emoji: "🌸",
+    href: "/shop?audience=for_her",
+    bg: "from-rose-50 to-pink-50",
+    border: "border-rose-200",
+  },
+  {
+    label: "For Him",
+    description: "Cool, useful, and he'll actually use it",
+    emoji: "⚡",
+    href: "/shop?audience=for_him",
+    bg: "from-amber-50 to-orange-50",
+    border: "border-amber-200",
+  },
+  {
+    label: "For Both of You",
+    description: "Share the experience together",
+    emoji: "🫶",
+    href: "/shop?audience=neutral",
+    bg: "from-purple-50 to-violet-50",
+    border: "border-purple-200",
+  },
 ];
 
-// ── Components ────────────────────────────────────────────────────────────────
+// ─── Sub-components ────────────────────────────────────────────────────────
 
 function SiteNav() {
   const [scrolled, setScrolled] = useState(false);
+
   useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 40);
-    window.addEventListener("scroll", fn, { passive: true });
-    return () => window.removeEventListener("scroll", fn);
+    const onScroll = () => setScrolled(window.scrollY > 36);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   return (
-    <header className={`fixed top-0 w-full z-50 px-5 py-4 flex items-center justify-between transition-all duration-300 ${scrolled ? "glass-strong border-b border-white/5" : ""}`}>
-      <Link href="/" className="font-display text-2xl font-bold tracking-tight text-white">
-        gamif<span className="text-accent">.</span>
-      </Link>
-      <nav className="hidden md:flex items-center gap-7 text-[11px] font-black tracking-[0.18em] uppercase text-white/50">
-        <Link href="/shop" className="hover:text-white transition-colors">Shop</Link>
-        <Link href="/build-a-box" className="hover:text-white transition-colors">Build a Box</Link>
-        <Link href="/quiz" className="hover:text-white transition-colors text-violet-2">Find My Vibe ✨</Link>
-      </nav>
-      <Link href="/build-a-box" className="btn-dopamine items-center gap-2 px-5 py-2.5 rounded-xl text-xs hidden md:flex">
-        <Gift className="w-3.5 h-3.5" /> Build a Box
-      </Link>
-    </header>
+    <motion.nav
+      className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
+      style={{
+        background: scrolled ? "rgba(251,248,244,0.92)" : "transparent",
+        backdropFilter: scrolled ? "blur(16px)" : "none",
+        borderBottom: scrolled ? "1px solid #EDE6DC" : "1px solid transparent",
+      }}
+    >
+      <div className="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
+        <Link href="/" className="font-display text-2xl font-bold text-[#1C1410]">
+          gamif<span style={{ color: "#C8445C" }}>.</span>
+        </Link>
+
+        <div className="hidden md:flex items-center gap-7 text-sm font-medium text-[#5C4038]">
+          <Link href="/shop" className="hover:text-[#C8445C] transition-colors">Shop</Link>
+          <Link href="/build-a-box" className="hover:text-[#C8445C] transition-colors">Build a Box</Link>
+          <Link href="/quiz" className="hover:text-[#C8445C] transition-colors">Vibe Quiz</Link>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Link
+            href="/build-a-box"
+            className="btn-rose px-5 py-2 rounded-xl text-sm font-bold inline-flex items-center gap-1.5"
+          >
+            <Gift className="w-3.5 h-3.5" /> Build a Box
+          </Link>
+        </div>
+      </div>
+    </motion.nav>
   );
 }
 
-function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: string }) {
-  const [count, setCount] = useState(0);
-  const ref = useRef<HTMLSpanElement>(null);
-  const started = useRef(false);
+function FadeUp({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-60px" });
 
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting && !started.current) {
-        started.current = true;
-        let start = 0;
-        const step = Math.ceil(target / 60);
-        const interval = setInterval(() => {
-          start = Math.min(start + step, target);
-          setCount(start);
-          if (start >= target) clearInterval(interval);
-        }, 16);
-      }
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [target]);
-
-  return <span ref={ref}>{count.toLocaleString()}{suffix}</span>;
-}
-
-function Footer() {
   return (
-    <footer className="bg-[#080808] border-t border-white/5 py-16 px-6">
-      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-12">
-        <div className="md:col-span-4">
-          <Link href="/" className="font-display text-3xl font-bold text-white mb-4 block">gamif<span className="text-accent">.</span></Link>
-          <p className="text-white/35 text-sm leading-relaxed max-w-xs">
-            Premium mystery gifting platform. Curated boxes, exclusive prices, dopamine-driven surprise mechanics.
-          </p>
-        </div>
-        <div className="md:col-span-2">
-          <h4 className="text-white/25 text-[10px] font-black uppercase tracking-widest mb-5">Shop</h4>
-          <ul className="space-y-3 text-sm text-white/50">
-            {[["All Products", "/shop"], ["For Her", "/shop?audience=for_her"], ["For Him", "/shop?audience=for_him"], ["Couples", "/shop?audience=couple"]].map(([l, h]) => (
-              <li key={l}><Link href={h} className="hover:text-white transition-colors">{l}</Link></li>
-            ))}
-          </ul>
-        </div>
-        <div className="md:col-span-2">
-          <h4 className="text-white/25 text-[10px] font-black uppercase tracking-widest mb-5">Experience</h4>
-          <ul className="space-y-3 text-sm text-white/50">
-            {[["Build a Box", "/build-a-box"], ["Vibe Quiz", "/quiz"], ["Lucky Spin", "/build-a-box"], ["Browse Vibes", "/shop"]].map(([l, h]) => (
-              <li key={l}><Link href={h} className="hover:text-white transition-colors">{l}</Link></li>
-            ))}
-          </ul>
-        </div>
-        <div className="md:col-span-2">
-          <h4 className="text-white/25 text-[10px] font-black uppercase tracking-widest mb-5">Support</h4>
-          <ul className="space-y-3 text-sm text-white/50">
-            {[["FAQ", "#"], ["Shipping", "#"], ["Contact", "#"]].map(([l, h]) => (
-              <li key={l}><Link href={h} className="hover:text-white transition-colors">{l}</Link></li>
-            ))}
-          </ul>
-        </div>
-      </div>
-      <div className="max-w-7xl mx-auto mt-16 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center text-white/25 text-xs">
-        <p>© {new Date().getFullYear()} Gamif. All rights reserved.</p>
-        <div className="flex gap-6 mt-4 md:mt-0">
-          <Link href="#" className="hover:text-white transition-colors">Privacy</Link>
-          <Link href="#" className="hover:text-white transition-colors">Terms</Link>
-        </div>
-      </div>
-    </footer>
+    <motion.div
+      ref={ref}
+      className={className}
+      initial={{ opacity: 0, y: 28 }}
+      animate={inView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 0.55, ease: ease.expo, delay }}
+    >
+      {children}
+    </motion.div>
   );
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+function BoxCard({ box, index }: { box: typeof FEATURED_BOXES[0]; index: number }) {
+  const [liked, setLiked] = useState(false);
 
-export default function HomePage() {
-  const heroRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
-  const heroY = useSpring(useTransform(scrollYProgress, [0, 1], ["0%", "28%"]), { stiffness: 100, damping: 30 });
-  const heroOpacity = useTransform(scrollYProgress, [0, 0.6], [1, 0]);
-  const heroScale = useTransform(scrollYProgress, [0, 1], [1, 1.05]);
+  return (
+    <FadeUp delay={index * 0.08}>
+      <div className="warm-card overflow-hidden group relative">
+        <div className="relative aspect-[4/3] overflow-hidden">
+          <Image
+            src={box.image}
+            alt={box.name}
+            fill
+            className="object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+          {box.badge && (
+            <div
+              className="absolute top-3 left-3 px-2.5 py-1 rounded-lg text-xs font-bold text-white"
+              style={{ background: "#C8445C" }}
+            >
+              {box.badge}
+            </div>
+          )}
+          <button
+            onClick={() => setLiked(!liked)}
+            aria-label={liked ? "Remove from wishlist" : "Add to wishlist"}
+            className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-all"
+            style={{ background: "rgba(255,255,255,0.9)" }}
+          >
+            <Heart
+              className="w-4 h-4 transition-colors"
+              style={{ color: liked ? "#C8445C" : "#9C8278", fill: liked ? "#C8445C" : "none" }}
+            />
+          </button>
+        </div>
 
-  const [activeTestimonial, setActiveTestimonial] = useState(0);
+        <div className="p-4">
+          <div className="flex gap-1.5 mb-2">
+            {box.tags.map((t) => (
+              <span
+                key={t}
+                className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                style={{ background: "#FBDDE2", color: "#C8445C" }}
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+          <h3 className="font-display text-lg font-bold text-[#1C1410] leading-snug mb-0.5">{box.name}</h3>
+          <p className="text-sm text-[#9C8278] mb-3">{box.tagline}</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-lg font-black text-[#1C1410]">{box.price}</span>
+              <span className="text-xs text-[#9C8278] line-through">{box.originalPrice}</span>
+            </div>
+            <Link
+              href={`/shop/${box.id}`}
+              className="btn-rose px-4 py-2 rounded-lg text-xs font-bold inline-flex items-center gap-1"
+            >
+              View Box <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+        </div>
+      </div>
+    </FadeUp>
+  );
+}
+
+function TestimonialsSection() {
+  const [active, setActive] = useState(0);
+
   useEffect(() => {
-    const t = setInterval(() => setActiveTestimonial((i) => (i + 1) % testimonials.length), 5000);
+    const t = setInterval(() => setActive((p) => (p + 1) % TESTIMONIALS.length), 5000);
     return () => clearInterval(t);
   }, []);
 
+  const prev = () => setActive((p) => (p - 1 + TESTIMONIALS.length) % TESTIMONIALS.length);
+  const next = () => setActive((p) => (p + 1) % TESTIMONIALS.length);
+
   return (
-    <main className="min-h-screen bg-[#0D0D0D] text-white overflow-x-hidden">
+    <section className="warm-section-alt py-20 px-5">
+      <div className="max-w-2xl mx-auto text-center">
+        <FadeUp>
+          <p className="text-xs uppercase tracking-[0.2em] font-bold text-[#9C8278] mb-2">Real Stories</p>
+          <h2 className="font-display text-3xl md:text-4xl font-bold text-[#1C1410] mb-10">
+            People who got it right
+          </h2>
+        </FadeUp>
+
+        <div className="relative">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={active}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -16 }}
+              transition={{ duration: 0.38, ease: ease.expo }}
+              className="warm-card p-8 mx-auto"
+            >
+              <div className="text-4xl mb-4">{TESTIMONIALS[active].emoji}</div>
+              <p className="text-[#3A241D] text-lg leading-relaxed font-medium mb-6 italic">
+                &ldquo;{TESTIMONIALS[active].text}&rdquo;
+              </p>
+              <div className="flex items-center justify-center gap-1 mb-3">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className="w-4 h-4 fill-[#C8445C] text-[#C8445C]" />
+                ))}
+              </div>
+              <p className="text-sm font-bold text-[#1C1410]">{TESTIMONIALS[active].name}</p>
+              <p className="text-xs text-[#9C8278]">{TESTIMONIALS[active].city}</p>
+            </motion.div>
+          </AnimatePresence>
+
+          <div className="flex items-center justify-center gap-4 mt-6">
+            <button
+              onClick={prev}
+              aria-label="Previous testimonial"
+              className="w-9 h-9 rounded-full border border-[#EDE6DC] flex items-center justify-center text-[#9C8278] hover:border-[#C8445C] hover:text-[#C8445C] transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <div className="flex gap-2">
+              {TESTIMONIALS.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setActive(i)}
+                  aria-label={`Go to testimonial ${i + 1}`}
+                  className="w-2 h-2 rounded-full transition-all"
+                  style={{ background: i === active ? "#C8445C" : "#EDE6DC" }}
+                />
+              ))}
+            </div>
+            <button
+              onClick={next}
+              aria-label="Next testimonial"
+              className="w-9 h-9 rounded-full border border-[#EDE6DC] flex items-center justify-center text-[#9C8278] hover:border-[#C8445C] hover:text-[#C8445C] transition-colors"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default function HomePage() {
+  const [activeOccasion, setActiveOccasion] = useState<string | null>(null);
+
+  return (
+    <div className="page-warm min-h-screen" style={{ fontFamily: "var(--font-sans)" }}>
       <SiteNav />
 
-      {/* ── Hero ──────────────────────────────────────────────────────────── */}
-      <section ref={heroRef} className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        {/* Parallax bg */}
-        <motion.div className="absolute inset-0" style={{ y: heroY, scale: heroScale }}>
-          <Image
-            src="https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=2000&q=85"
-            alt="Premium mystery gift"
-            fill className="object-cover opacity-15" priority
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0D0D0D]/60 via-transparent to-[#0D0D0D]" />
-        </motion.div>
-
-        {/* Ambient glows */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <motion.div
-            className="absolute top-1/3 left-1/4 w-[500px] h-[500px] rounded-full blur-[140px]"
-            style={{ background: "rgba(255,45,120,0.15)" }}
-            animate={{ scale: [1, 1.15, 1], opacity: [0.15, 0.25, 0.15] }}
-            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-          />
-          <motion.div
-            className="absolute bottom-1/3 right-1/4 w-[400px] h-[400px] rounded-full blur-[120px]"
-            style={{ background: "rgba(124,58,237,0.15)" }}
-            animate={{ scale: [1, 1.2, 1], opacity: [0.15, 0.3, 0.15] }}
-            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-          />
-        </div>
-
-        {/* Content */}
-        <motion.div
-          className="relative z-10 text-center px-6 max-w-5xl mx-auto"
-          style={{ opacity: heroOpacity }}
-          initial="hidden"
-          animate="visible"
-          variants={stagger(0.1, 0.1)}
-        >
-          <motion.div variants={fadeUp}>
-            <span className="inline-flex items-center gap-2 px-4 py-2 glass rounded-full text-xs font-black tracking-[0.2em] uppercase text-accent mb-8 border border-accent/20">
-              <Sparkles className="w-3 h-3" /> Premium Mystery Gift Platform
-            </span>
-          </motion.div>
-
-          <motion.h1
-            variants={fadeUp}
-            className="font-display text-6xl sm:text-7xl lg:text-[92px] font-bold leading-[1.0] tracking-tight mb-8"
-          >
-            The gift they{" "}
-            <span
-              className="font-black"
-              style={{ background: "linear-gradient(135deg, #FF2D78 0%, #C026D3 50%, #7C3AED 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}
+      {/* ── Hero ─────────────────────────────────────────────────────────── */}
+      <section className="pt-24 pb-16 px-5 max-w-6xl mx-auto">
+        <div className="grid md:grid-cols-2 gap-10 items-center">
+          {/* Left — copy */}
+          <div>
+            <motion.p
+              className="text-xs uppercase tracking-[0.25em] font-bold mb-4"
+              style={{ color: "#C8445C" }}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: ease.expo }}
             >
-              never saw coming.
-            </span>
-          </motion.h1>
+              Partner gifting, made easy
+            </motion.p>
 
-          <motion.p variants={fadeUp} className="text-xl text-white/60 max-w-2xl mx-auto leading-relaxed mb-10">
-            Build a curated mystery box with suspense, lucky rewards, and cinematic unboxing.
-            At exclusive{" "}
-            <span className="text-accent font-bold">box prices</span>{" "}
-            — always cheaper than buying separately.
-          </motion.p>
-
-          <motion.div variants={fadeUp} className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
-            <Link href="/build-a-box" className="btn-dopamine px-10 py-4 rounded-2xl text-sm font-black inline-flex items-center gap-3">
-              <Gift className="w-5 h-5" /> Build Your Box <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link href="/quiz"
-              className="px-10 py-4 rounded-2xl glass font-bold text-sm uppercase tracking-wider inline-flex items-center gap-2 hover:bg-white/8 transition-all border border-white/10 hover:border-white/20"
+            <motion.h1
+              className="font-display text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-5"
+              style={{ color: "#1C1410" }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.07, ease: ease.expo }}
             >
-              <Brain className="w-4 h-4 text-violet-2" /> Find My Vibe
-            </Link>
-          </motion.div>
+              A gift they&apos;ll actually{" "}
+              <span style={{ color: "#C8445C" }}>love</span>.
+            </motion.h1>
 
-          {/* Price teaser badge */}
-          <motion.div variants={fadeUp} className="inline-flex items-center gap-5 glass-strong rounded-2xl px-7 py-4 border border-white/8">
-            <div className="text-center">
-              <p className="text-white/25 text-[10px] font-black uppercase tracking-widest mb-1">Normal</p>
-              <p className="text-white/40 text-2xl font-bold line-through">49 ₾</p>
-            </div>
-            <div className="text-white/15 text-2xl">→</div>
-            <div className="text-center">
-              <p className="text-accent text-[10px] font-black uppercase tracking-widest mb-1">✨ Box Price</p>
-              <p className="text-white text-3xl font-black">40 ₾</p>
-            </div>
-            <span className="box-price-badge ml-1 hidden sm:flex">Save 18%</span>
-          </motion.div>
-        </motion.div>
+            <motion.p
+              className="text-base md:text-lg leading-relaxed mb-8"
+              style={{ color: "#5C4038" }}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.55, delay: 0.14, ease: ease.expo }}
+            >
+              Curated mystery boxes for your girlfriend, boyfriend, wife, or husband.
+              Pick a vibe, add a note, and we&apos;ll take care of the rest.
+            </motion.p>
 
-        {/* Activity feed bottom-left */}
-        <div className="absolute bottom-8 left-5 z-20 hidden lg:block">
-          <ActivityFeed />
-        </div>
-
-        {/* Scroll indicator */}
-        <motion.div
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10"
-          animate={{ y: [0, 8, 0] }}
-          transition={{ duration: 1.8, repeat: Infinity }}
-        >
-          <div className="w-5 h-9 border-2 border-white/15 rounded-full flex justify-center pt-1.5">
-            <div className="w-0.5 h-1.5 bg-white/30 rounded-full" />
-          </div>
-        </motion.div>
-      </section>
-
-      {/* ── Stats bar ─────────────────────────────────────────────────────── */}
-      <section className="bg-[#0f0f0f] border-y border-white/5 py-10">
-        <div className="max-w-5xl mx-auto px-6">
-          <motion.div
-            className="grid grid-cols-2 md:grid-cols-4 gap-6"
-            initial="hidden"
-            whileInView="visible"
-            viewport={viewport}
-            variants={stagger(0.08)}
-          >
-            {stats.map((s, i) => (
-              <motion.div key={s.label} variants={fadeUp} className="text-center">
-                <p className="text-3xl font-black text-white mb-1">{s.value}</p>
-                <p className="text-white/30 text-[10px] font-black uppercase tracking-wider">{s.label}</p>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ── Vibe Quiz CTA ─────────────────────────────────────────────────── */}
-      <section className="py-24 px-6 relative overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-violet/8 blur-[100px] rounded-full" />
-        </div>
-        <div className="max-w-4xl mx-auto">
-          <motion.div
-            className="relative rounded-3xl overflow-hidden"
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={viewport}
-            transition={{ duration: 0.7, ease: ease.expo }}
-            style={{ background: "linear-gradient(135deg, rgba(124,58,237,0.15) 0%, rgba(255,45,120,0.1) 100%)", border: "1px solid rgba(124,58,237,0.25)" }}
-          >
-            {/* Shimmer */}
+            {/* Occasion pills */}
             <motion.div
-              className="absolute inset-0 pointer-events-none"
-              style={{ background: "linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.04) 50%, transparent 70%)" }}
-              animate={{ x: ["-100%", "200%"] }}
-              transition={{ duration: 4, repeat: Infinity, repeatDelay: 3 }}
-            />
-            <div className="relative p-8 md:p-12 flex flex-col md:flex-row items-center gap-8">
-              <div className="flex-1">
-                <motion.span
-                  className="text-xs font-black uppercase tracking-[0.25em] text-violet-2 mb-4 block"
-                  initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={viewport}
+              className="flex flex-wrap gap-2 mb-8"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.22 }}
+            >
+              {OCCASIONS.map((o) => (
+                <button
+                  key={o.label}
+                  onClick={() => setActiveOccasion(activeOccasion === o.label ? null : o.label)}
+                  className="px-3 py-1.5 rounded-full text-sm font-medium border transition-all"
+                  style={{
+                    background: activeOccasion === o.label ? "#C8445C" : "#FDFAF7",
+                    color: activeOccasion === o.label ? "#fff" : "#5C4038",
+                    borderColor: activeOccasion === o.label ? "#C8445C" : "#EDE6DC",
+                  }}
                 >
-                  Vibe Matchmaking ✨
-                </motion.span>
-                <h2 className="font-display text-4xl lg:text-5xl font-bold text-white mb-4 leading-tight">
-                  Not sure what to get?
-                  <br />
-                  <span style={{ background: "linear-gradient(135deg, #C084FC, #FF2D78)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                    We&apos;ll figure it out.
-                  </span>
-                </h2>
-                <p className="text-white/50 text-base leading-relaxed mb-8 max-w-md">
-                  Answer 5 questions about your person. Get a curated box recommendation that feels made for them — not picked for a stranger.
-                </p>
-                <div className="flex flex-wrap gap-2 mb-8">
-                  {["Who is it for?", "What's the vibe?", "What occasion?", "What's the energy?"].map((q) => (
-                    <span key={q} className="text-xs px-3 py-1.5 rounded-full bg-white/8 text-white/50 border border-white/10">
-                      {q}
-                    </span>
-                  ))}
-                </div>
-                <Link
-                  href="/quiz"
-                  className="inline-flex items-center gap-3 px-8 py-4 rounded-2xl text-sm font-black"
-                  style={{ background: "linear-gradient(135deg, #7C3AED, #C026D3)", boxShadow: "0 0 30px rgba(124,58,237,0.4)" }}
-                >
-                  <Brain className="w-4 h-4" />
-                  Take the Vibe Quiz
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
-              </div>
-              <div className="relative w-full md:w-64 shrink-0">
-                <div className="grid grid-cols-2 gap-3">
-                  {["🌹", "💎", "🕯️", "🌸"].map((e, i) => (
-                    <motion.div
-                      key={i}
-                      className="aspect-square rounded-2xl glass border border-white/10 flex items-center justify-center text-4xl"
-                      animate={{ y: [0, -6, 0] }}
-                      transition={{ duration: 2.5 + i * 0.4, repeat: Infinity, ease: "easeInOut", delay: i * 0.3 }}
-                    >
-                      {e}
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ── Dual pricing ──────────────────────────────────────────────────── */}
-      <section className="py-24 px-6 bg-[#0f0f0f]">
-        <div className="max-w-4xl mx-auto">
-          <motion.div
-            initial="hidden" whileInView="visible" viewport={viewport}
-            variants={stagger(0.1)} className="text-center mb-16"
-          >
-            <motion.span variants={fadeUp} className="text-accent text-xs font-black uppercase tracking-[0.3em] mb-4 block">The Box Advantage</motion.span>
-            <motion.h2 variants={fadeUp} className="font-display text-4xl lg:text-5xl font-bold text-white mb-5">Two prices. One is way better.</motion.h2>
-            <motion.p variants={fadeUp} className="text-white/50 text-lg max-w-2xl mx-auto">
-              Every product has a retail price — and a lower <span className="text-white font-bold">box price</span> applied when added to a gift box.
-            </motion.p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 32 }} whileInView={{ opacity: 1, y: 0 }} viewport={viewport}
-            transition={{ duration: 0.7, ease: ease.expo }}
-            className="glass rounded-3xl p-6 md:p-10 border border-white/8"
-          >
-            <div className="flex flex-col md:flex-row items-center gap-6">
-              <div className="flex-1 w-full p-6 rounded-2xl bg-white/3 border border-white/8 text-center md:text-left">
-                <p className="text-white/30 text-[10px] font-black uppercase tracking-widest mb-3">Normal Purchase</p>
-                <p className="text-5xl font-black text-white/40 mb-3 line-through">49 ₾</p>
-                <p className="text-white/30 text-sm">Standard retail. Available anytime.</p>
-              </div>
-              <div className="text-3xl font-thin text-white/15 hidden md:block">→</div>
-              <div className="flex-1 w-full p-6 rounded-2xl border text-center md:text-left relative overflow-hidden"
-                style={{ background: "linear-gradient(135deg, rgba(255,45,120,0.1), rgba(124,58,237,0.08))", borderColor: "rgba(255,45,120,0.3)" }}>
-                <div className="absolute top-3 right-3"><span className="box-price-badge">Exclusive</span></div>
-                <p className="text-accent text-[10px] font-black uppercase tracking-widest mb-3">✨ Add To Box</p>
-                <p className="text-5xl font-black text-white mb-1">40 ₾</p>
-                <p className="text-accent/80 text-sm font-bold">You save 9 ₾ (18% off)</p>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ── Vibe browsing ─────────────────────────────────────────────────── */}
-      <section className="py-24 px-6">
-        <div className="max-w-7xl mx-auto">
-          <motion.div initial="hidden" whileInView="visible" viewport={viewport} variants={stagger(0.1)} className="text-center mb-14">
-            <motion.span variants={fadeUp} className="text-violet-2 text-xs font-black uppercase tracking-[0.3em] mb-4 block">Shop by Mood</motion.span>
-            <motion.h2 variants={fadeUp} className="font-display text-4xl lg:text-5xl font-bold">What&apos;s the vibe?</motion.h2>
-          </motion.div>
-
-          <motion.div
-            className="grid grid-cols-2 lg:grid-cols-4 gap-4"
-            initial="hidden" whileInView="visible" viewport={viewport}
-            variants={stagger(0.07)}
-          >
-            {vibeCards.map((v, i) => (
-              <motion.div key={v.vibe} variants={fadeUp}>
-                <Link href={`/shop?vibe=${v.vibe}`}
-                  className="group relative overflow-hidden rounded-3xl aspect-[3/4] flex flex-col justify-end p-5 block"
-                >
-                  <Image src={v.img} alt={v.label} fill className="object-cover transition-transform duration-700 group-hover:scale-108" />
-                  <div className={`absolute inset-0 bg-gradient-to-t ${v.color} opacity-65 group-hover:opacity-80 transition-opacity duration-400`} />
-                  <motion.div
-                    className="absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                    style={{ boxShadow: `inset 0 0 60px ${v.glow}` }}
-                  />
-                  <div className="relative z-10">
-                    <span className="text-4xl mb-2 block">{v.emoji}</span>
-                    <h3 className="font-display text-3xl font-bold text-white">{v.label}</h3>
-                    <p className="text-white/60 text-sm mt-1 flex items-center gap-2">
-                      Shop gifts <ArrowRight className="w-3 h-3 group-hover:translate-x-2 transition-transform" />
-                    </p>
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ── How it works ──────────────────────────────────────────────────── */}
-      <section className="py-24 px-6 bg-[#0f0f0f]">
-        <div className="max-w-5xl mx-auto">
-          <motion.div initial="hidden" whileInView="visible" viewport={viewport} variants={stagger(0.1)} className="text-center mb-18">
-            <motion.span variants={fadeUp} className="text-gold text-xs font-black uppercase tracking-[0.3em] mb-4 block">The Experience</motion.span>
-            <motion.h2 variants={fadeUp} className="font-display text-4xl lg:text-5xl font-bold">How it works</motion.h2>
-          </motion.div>
-          <div className="grid md:grid-cols-4 gap-8 mt-14">
-            {howItWorks.map((step, i) => (
-              <motion.div
-                key={step.step}
-                initial={{ opacity: 0, y: 36 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={viewport}
-                transition={{ delay: i * 0.12, duration: 0.65, ease: ease.expo }}
-                className="text-center"
-              >
-                <motion.div
-                  className="inline-flex items-center justify-center w-16 h-16 glass rounded-2xl text-3xl mb-4 border border-white/10"
-                  whileHover={{ scale: 1.08, rotate: 5 }}
-                  transition={springs.bouncy}
-                >
-                  {step.icon}
-                </motion.div>
-                <p className="text-white/20 text-[10px] font-black uppercase tracking-[0.2em] mb-2">{step.step}</p>
-                <h3 className="font-bold text-base text-white mb-2">{step.title}</h3>
-                <p className="text-white/45 text-sm leading-relaxed">{step.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Lucky Spin teaser ─────────────────────────────────────────────── */}
-      <section className="py-24 px-6 relative overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none">
-          <motion.div
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] rounded-full blur-[180px]"
-            style={{ background: "rgba(124,58,237,0.12)" }}
-            animate={{ scale: [1, 1.15, 1] }}
-            transition={{ duration: 5, repeat: Infinity }}
-          />
-        </div>
-        <div className="max-w-4xl mx-auto text-center relative z-10">
-          <motion.div initial="hidden" whileInView="visible" viewport={viewport} variants={stagger(0.1)}>
-            <motion.div variants={fadeUp} className="text-6xl mb-6 inline-block">
-              <motion.span
-                className="block"
-                animate={{ y: [0, -10, 0], rotate: [0, 5, -5, 0] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              >
-                🎡
-              </motion.span>
-            </motion.div>
-            <motion.h2 variants={fadeUp} className="font-display text-5xl lg:text-7xl font-bold mb-5">
-              <span style={{ background: "linear-gradient(135deg, #FF2D78, #7C3AED)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                Spin to win
-              </span>
-              <br />a surprise reward.
-            </motion.h2>
-            <motion.p variants={fadeUp} className="text-white/50 text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
-              Complete your box and spin the lucky wheel. Free shipping, gift upgrades, secret items — all server-generated.
-            </motion.p>
-            <motion.div variants={fadeUp} className="flex flex-wrap justify-center gap-3">
-              {["🚚 Free Shipping", "💸 10% Off", "🎁 Free Gift", "✨ Secret Item", "⬆️ Upgrade"].map((r) => (
-                <motion.span
-                  key={r}
-                  className="px-4 py-2 glass rounded-full text-sm font-bold border border-white/10"
-                  whileHover={{ scale: 1.05, borderColor: "rgba(255,45,120,0.4)" }}
-                  transition={springs.snappy}
-                >
-                  {r}
-                </motion.span>
+                  {o.emoji} {o.label}
+                </button>
               ))}
             </motion.div>
+
+            <motion.div
+              className="flex flex-col sm:flex-row gap-3"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.28, duration: 0.5, ease: ease.expo }}
+            >
+              <Link
+                href={activeOccasion ? `/shop?occasion=${encodeURIComponent(activeOccasion)}` : "/shop"}
+                className="btn-rose px-7 py-3.5 rounded-xl text-sm font-bold inline-flex items-center justify-center gap-2"
+              >
+                <Sparkles className="w-4 h-4" />
+                {activeOccasion ? `Shop ${activeOccasion} Gifts` : "Shop All Gifts"}
+              </Link>
+              <Link
+                href="/build-a-box"
+                className="px-7 py-3.5 rounded-xl text-sm font-bold border border-[#EDE6DC] text-[#5C4038] hover:border-[#C8445C] hover:text-[#C8445C] transition-all inline-flex items-center justify-center gap-2"
+              >
+                <Gift className="w-4 h-4" />
+                Build Your Own Box
+              </Link>
+            </motion.div>
+          </div>
+
+          {/* Right — image collage */}
+          <motion.div
+            className="relative h-[420px] md:h-[480px]"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.7, delay: 0.1, ease: ease.expo }}
+          >
+            {/* Main image */}
+            <div
+              className="absolute inset-0 rounded-3xl overflow-hidden"
+              style={{ border: "1px solid #EDE6DC" }}
+            >
+              <Image
+                src="https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=800&q=80"
+                alt="Gift box"
+                fill
+                className="object-cover"
+                priority
+              />
+              <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(28,20,16,0.35) 0%, transparent 60%)" }} />
+            </div>
+
+            {/* Floating review badge */}
+            <motion.div
+              className="absolute bottom-6 left-5 warm-card px-4 py-3 flex items-center gap-3"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.55, ...springs.bouncy }}
+              style={{ maxWidth: 220 }}
+            >
+              <div className="text-2xl">💌</div>
+              <div>
+                <div className="flex gap-0.5 mb-0.5">
+                  {[...Array(5)].map((_, i) => <Star key={i} className="w-3 h-3 fill-[#C8445C] text-[#C8445C]" />)}
+                </div>
+                <p className="text-xs font-bold text-[#1C1410]">She cried happy tears</p>
+                <p className="text-[10px] text-[#9C8278]">Giorgi T., Tbilisi</p>
+              </div>
+            </motion.div>
+
+            {/* Floating stats badge */}
+            <motion.div
+              className="absolute top-5 right-5 warm-card px-4 py-3 text-center"
+              initial={{ opacity: 0, y: -16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.65, ...springs.bouncy }}
+            >
+              <p className="text-2xl font-black text-[#1C1410]">2,400+</p>
+              <p className="text-xs text-[#9C8278]">happy couples</p>
+            </motion.div>
           </motion.div>
         </div>
       </section>
 
-      {/* ── Testimonials ──────────────────────────────────────────────────── */}
-      <section className="py-24 px-6 bg-[#0f0f0f]">
-        <div className="max-w-3xl mx-auto text-center">
-          <motion.span
-            className="text-gold text-xs font-black uppercase tracking-[0.3em] mb-10 block"
-            initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={viewport}
-          >
-            Real Stories
-          </motion.span>
-          <div className="relative min-h-[200px]">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTestimonial}
-                initial={{ opacity: 0, y: 20, filter: "blur(8px)" }}
-                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                exit={{ opacity: 0, y: -20, filter: "blur(8px)" }}
-                transition={{ duration: 0.55, ease: ease.expo }}
-              >
-                <div className="flex justify-center gap-1 mb-6">
-                  {[1, 2, 3, 4, 5].map((s) => <Star key={s} className="w-5 h-5 text-gold fill-gold" />)}
-                </div>
-                <blockquote className="font-display text-2xl md:text-3xl font-medium text-white/85 leading-snug mb-6">
-                  &ldquo;{testimonials[activeTestimonial].quote}&rdquo;
-                </blockquote>
-                <p className="text-white/35 text-xs font-bold uppercase tracking-widest">
-                  {testimonials[activeTestimonial].name} · {testimonials[activeTestimonial].location} · {testimonials[activeTestimonial].tag}
-                </p>
-              </motion.div>
-            </AnimatePresence>
-          </div>
-          <div className="flex justify-center gap-2 mt-8">
-            {testimonials.map((_, i) => (
-              <button key={i} onClick={() => setActiveTestimonial(i)}
-                className={`rounded-full transition-all ${i === activeTestimonial ? "w-5 h-2 bg-accent" : "w-2 h-2 bg-white/20"}`}
-              />
+      {/* ── Shopping for... ──────────────────────────────────────────────── */}
+      <section className="warm-section-alt py-16 px-5">
+        <div className="max-w-5xl mx-auto">
+          <FadeUp>
+            <h2 className="font-display text-3xl md:text-4xl font-bold text-center mb-2" style={{ color: "#1C1410" }}>
+              Who are you shopping for?
+            </h2>
+            <p className="text-center text-sm mb-10" style={{ color: "#9C8278" }}>
+              Every box is chosen for a specific person, not just a price tag.
+            </p>
+          </FadeUp>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            {FOR_WHO.map((w, i) => (
+              <FadeUp key={w.label} delay={i * 0.09}>
+                <Link href={w.href}>
+                  <div
+                    className={`rounded-2xl border p-6 text-center hover:shadow-md transition-all duration-300 cursor-pointer group bg-gradient-to-br ${w.bg} ${w.border}`}
+                  >
+                    <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">
+                      {w.emoji}
+                    </div>
+                    <h3 className="font-display text-xl font-bold mb-1" style={{ color: "#1C1410" }}>
+                      {w.label}
+                    </h3>
+                    <p className="text-sm" style={{ color: "#9C8278" }}>{w.description}</p>
+                    <div
+                      className="mt-4 text-xs font-bold inline-flex items-center gap-1 group-hover:gap-2 transition-all"
+                      style={{ color: "#C8445C" }}
+                    >
+                      Browse gifts <ArrowRight className="w-3 h-3" />
+                    </div>
+                  </div>
+                </Link>
+              </FadeUp>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── Final CTA ─────────────────────────────────────────────────────── */}
-      <section className="relative py-32 px-6 overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 left-1/3 w-[500px] h-[500px] bg-accent/12 rounded-full blur-[160px]" />
-          <div className="absolute bottom-0 right-1/3 w-[500px] h-[500px] bg-violet/12 rounded-full blur-[160px]" />
+      {/* ── Featured boxes ───────────────────────────────────────────────── */}
+      <section className="warm-section py-16 px-5">
+        <div className="max-w-6xl mx-auto">
+          <FadeUp>
+            <div className="flex items-end justify-between mb-10">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] font-bold mb-1" style={{ color: "#C8445C" }}>
+                  Curated for partners
+                </p>
+                <h2 className="font-display text-3xl md:text-4xl font-bold" style={{ color: "#1C1410" }}>
+                  Ready to gift
+                </h2>
+              </div>
+              <Link
+                href="/shop"
+                className="text-sm font-semibold inline-flex items-center gap-1 hover:gap-2 transition-all"
+                style={{ color: "#C8445C" }}
+              >
+                See all <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </FadeUp>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {FEATURED_BOXES.map((box, i) => (
+              <BoxCard key={box.id} box={box} index={i} />
+            ))}
+          </div>
         </div>
-        <motion.div
-          className="relative z-10 max-w-3xl mx-auto text-center"
-          initial="hidden" whileInView="visible" viewport={viewport}
-          variants={stagger(0.1)}
-        >
-          <motion.h2 variants={fadeUp} className="font-display text-5xl md:text-7xl font-bold leading-none mb-6">
-            Make it a{" "}
-            <span style={{ background: "linear-gradient(135deg, #FF2D78, #7C3AED)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-              moment.
-            </span>
-          </motion.h2>
-          <motion.p variants={fadeUp} className="text-white/50 text-xl mb-12 max-w-lg mx-auto">
-            Build an unforgettable gift box — with exclusive prices and a lucky spin reward.
-          </motion.p>
-          <motion.div variants={fadeUp} className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Link href="/build-a-box" className="btn-dopamine px-12 py-5 rounded-2xl text-sm font-black inline-flex items-center gap-3">
-              <Zap className="w-5 h-5" /> Start Building Now <ArrowRight className="w-5 h-5" />
-            </Link>
-            <Link href="/quiz"
-              className="px-12 py-5 rounded-2xl glass text-sm font-bold inline-flex items-center gap-2 border border-white/10 hover:border-white/25 transition-all"
-            >
-              <Brain className="w-4 h-4 text-violet-2" /> Take the Quiz First
-            </Link>
-          </motion.div>
-        </motion.div>
       </section>
 
-      <Footer />
-    </main>
+      {/* ── How it works ────────────────────────────────────────────────── */}
+      <section className="warm-section-alt py-16 px-5">
+        <div className="max-w-4xl mx-auto">
+          <FadeUp>
+            <h2 className="font-display text-3xl md:text-4xl font-bold text-center mb-2" style={{ color: "#1C1410" }}>
+              Gifting in 3 minutes
+            </h2>
+            <p className="text-center text-sm mb-12" style={{ color: "#9C8278" }}>
+              No overthinking. We make it easy.
+            </p>
+          </FadeUp>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                step: "1",
+                title: "Pick a vibe",
+                body: "Romantic, cozy, adventurous — tell us the mood and we'll curate the right items.",
+                emoji: "🌸",
+              },
+              {
+                step: "2",
+                title: "Write a note",
+                body: "Add a personal message and we'll include it beautifully inside the box.",
+                emoji: "💌",
+              },
+              {
+                step: "3",
+                title: "We deliver",
+                body: "Your box arrives gift-wrapped and ready to make them smile.",
+                emoji: "🎁",
+              },
+            ].map((s, i) => (
+              <FadeUp key={s.step} delay={i * 0.1}>
+                <div className="warm-card p-6 text-center">
+                  <div className="text-4xl mb-4">{s.emoji}</div>
+                  <div
+                    className="w-7 h-7 rounded-full text-white text-xs font-black flex items-center justify-center mx-auto mb-3"
+                    style={{ background: "#C8445C" }}
+                  >
+                    {s.step}
+                  </div>
+                  <h3 className="font-display text-xl font-bold mb-2" style={{ color: "#1C1410" }}>
+                    {s.title}
+                  </h3>
+                  <p className="text-sm leading-relaxed" style={{ color: "#9C8278" }}>{s.body}</p>
+                </div>
+              </FadeUp>
+            ))}
+          </div>
+
+          <FadeUp delay={0.3}>
+            <div className="text-center mt-10">
+              <Link
+                href="/build-a-box"
+                className="btn-rose px-8 py-4 rounded-xl font-bold inline-flex items-center gap-2"
+              >
+                <Gift className="w-4 h-4" />
+                Start Building a Box
+              </Link>
+            </div>
+          </FadeUp>
+        </div>
+      </section>
+
+      {/* ── Vibe quiz strip ──────────────────────────────────────────────── */}
+      <section className="warm-section py-14 px-5">
+        <div className="max-w-3xl mx-auto">
+          <FadeUp>
+            <div
+              className="rounded-3xl p-8 md:p-10 flex flex-col md:flex-row items-center gap-7 text-center md:text-left"
+              style={{ background: "#FBDDE2", border: "1px solid #F3C0C8" }}
+            >
+              <div className="text-5xl shrink-0">✨</div>
+              <div className="flex-1">
+                <h3 className="font-display text-2xl font-bold mb-2" style={{ color: "#1C1410" }}>
+                  Not sure where to start?
+                </h3>
+                <p className="text-sm mb-5" style={{ color: "#7A4050" }}>
+                  Answer 5 quick questions and we&apos;ll match you with the perfect gift based on your partner&apos;s personality.
+                </p>
+                <Link
+                  href="/quiz"
+                  className="btn-rose px-6 py-3 rounded-xl text-sm font-bold inline-flex items-center gap-2"
+                >
+                  <Sparkles className="w-3.5 h-3.5" /> Take the Vibe Quiz
+                </Link>
+              </div>
+            </div>
+          </FadeUp>
+        </div>
+      </section>
+
+      {/* ── Testimonials ─────────────────────────────────────────────────── */}
+      <TestimonialsSection />
+
+      {/* ── Footer ───────────────────────────────────────────────────────── */}
+      <footer
+        className="py-12 px-5 border-t"
+        style={{ background: "#F5EFE8", borderColor: "#EDE6DC" }}
+      >
+        <div className="max-w-6xl mx-auto grid md:grid-cols-4 gap-8">
+          <div>
+            <Link href="/" className="font-display text-2xl font-bold" style={{ color: "#1C1410" }}>
+              gamif<span style={{ color: "#C8445C" }}>.</span>
+            </Link>
+            <p className="text-sm mt-2" style={{ color: "#9C8278" }}>
+              The easiest way to gift your partner something they&apos;ll actually love.
+            </p>
+          </div>
+
+          <div>
+            <p className="text-xs uppercase tracking-widest font-bold mb-3" style={{ color: "#9C8278" }}>Shop</p>
+            <div className="flex flex-col gap-2 text-sm" style={{ color: "#5C4038" }}>
+              <Link href="/shop?audience=for_her" className="hover:text-[#C8445C] transition-colors">For Her</Link>
+              <Link href="/shop?audience=for_him" className="hover:text-[#C8445C] transition-colors">For Him</Link>
+              <Link href="/shop?audience=neutral" className="hover:text-[#C8445C] transition-colors">For Both</Link>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs uppercase tracking-widest font-bold mb-3" style={{ color: "#9C8278" }}>Build</p>
+            <div className="flex flex-col gap-2 text-sm" style={{ color: "#5C4038" }}>
+              <Link href="/build-a-box" className="hover:text-[#C8445C] transition-colors">Build a Box</Link>
+              <Link href="/quiz" className="hover:text-[#C8445C] transition-colors">Vibe Quiz</Link>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs uppercase tracking-widest font-bold mb-3" style={{ color: "#9C8278" }}>Help</p>
+            <div className="flex flex-col gap-2 text-sm" style={{ color: "#5C4038" }}>
+              <Link href="#" className="hover:text-[#C8445C] transition-colors">How It Works</Link>
+              <Link href="#" className="hover:text-[#C8445C] transition-colors">Delivery Info</Link>
+              <Link href="#" className="hover:text-[#C8445C] transition-colors">Contact Us</Link>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-6xl mx-auto mt-8 pt-6 border-t flex flex-col md:flex-row items-center justify-between gap-2" style={{ borderColor: "#EDE6DC" }}>
+          <p className="text-xs" style={{ color: "#9C8278" }}>© 2025 Gamif. Made with love in Georgia 🇬🇪</p>
+          <div className="flex items-center gap-1 text-xs" style={{ color: "#9C8278" }}>
+            <Heart className="w-3 h-3 fill-[#C8445C] text-[#C8445C]" /> gifting that actually works
+          </div>
+        </div>
+      </footer>
+    </div>
   );
 }

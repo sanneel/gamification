@@ -36,8 +36,39 @@ body {
 
 /* Shop pages use the dark theme; homepage keeps warm theme via local overrides */
 .page-warm {
-  background: #FAF5EE;
-  color: #241611;
+  background: #FBF8F4;
+  color: #1C1410;
+}
+
+/* ── Warm rose button ──────────────────────────────────────────────────────── */
+.btn-rose {
+  background: #C8445C;
+  color: #fff;
+  font-weight: 700;
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+.btn-rose:hover {
+  background: #B03650;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(200, 68, 92, 0.35);
+}
+.btn-rose:active {
+  transform: translateY(0);
+}
+
+/* ── Warm card ─────────────────────────────────────────────────────────────── */
+.warm-card {
+  background: #FDFAF7;
+  border: 1px solid #EDE6DC;
+  border-radius: 1.25rem;
+}
+
+/* ── Warm section divider ──────────────────────────────────────────────────── */
+.warm-section {
+  background: #FBF8F4;
+}
+.warm-section-alt {
+  background: #F5EFE8;
 }
 
 button, input, select, textarea { font: inherit; }

@@ -1,58 +1,174 @@
-# Gamified Gift Box MVP
+# Gamif — Premium Mystery Gift Platform
 
-Lightweight custom commerce engine for a viral gift box builder. The app uses Next.js App Router, TypeScript, TailwindCSS, Supabase Postgres, and Stripe Checkout Sessions.
+A cinematic, dopamine-driven gifting platform built for the Georgian market. Users build curated mystery gift boxes at exclusive **box prices**, spin a lucky wheel for surprise rewards, and experience an unboxing moment that's meant to be shared on TikTok.
 
-## Core Flow
+---
 
-1. Customer selects one large item, one medium item, and one free small item.
-2. `/api/session/save` persists the selection in `gift_sessions`.
-3. `/api/spin` assigns a weighted server-side reward once per session.
-4. `/api/checkout` reloads the session from Supabase, validates item categories, calculates totals server-side, creates a Stripe Checkout Session, and stores a pending order.
-5. `/api/webhook/stripe` verifies Stripe signatures, marks the order paid, and completes the gift session.
+## Architecture
 
-## Setup
+```
+/                   → Next.js 14 frontend (App Router, TypeScript)
+/server             → NestJS backend (PostgreSQL, Prisma, Redis)
+/docker-compose.yml → Full stack local dev
+```
 
-1. Create a Supabase project.
-2. Run `supabase/schema.sql` in the Supabase SQL editor.
-3. Copy `.env.example` to `.env.local` and fill in Supabase and Stripe values.
-4. Run `npm install`.
-5. Run `npm run dev`.
+## Stack
 
-For local Stripe webhooks:
+| Layer    | Technology                              |
+|----------|-----------------------------------------|
+| Frontend | Next.js 14, Tailwind CSS, Framer Motion |
+| Backend  | NestJS, Prisma ORM, Redis               |
+| Database | PostgreSQL                              |
+| Payments | Stripe (GEL currency)                   |
+| Hosting  | Docker / any Node.js PaaS               |
 
+---
+
+## Key Features
+
+### Dual Pricing System
+Every product has two prices:
+- **Normal Price** — standard retail (e.g. 49 ₾)
+- **Box Price** — exclusive discounted price when added to a gift box (e.g. 40 ₾)
+
+The box price creates higher perceived value, increased AOV, and gamified shopping psychology.
+
+### Box Builder
+Users select 3 items across 3 slots:
+1. **Main Surprise** — the star of the box
+2. **Sweet Pick** — a complementary item
+3. **Tiny Extra** — a small bonus
+
+### Lucky Spin Wheel
+After completing the box, users spin a wheel for a reward:
+- 🚚 Free Shipping (30%)
+- 💸 10% Discount (25%)
+- 🎁 Free Tiny Gift (20%)
+- ✨ Secret Item (10%)
+- ⬆️ Gift Upgrade (5%)
+- 🔄 No Reward (10%)
+
+**The spin result is 100% server-side.** The frontend only animates to the result — it cannot cheat.
+
+### Product Sync
+Products come from an external backoffice system via:
+- `POST /api/products/sync` — batch upsert
+- `PUT /api/products/sync/:externalId/stock` — inventory update
+- `POST /api/webhooks/product-sync` — realtime webhook
+
+### Admin Panel
+Available at `/admin`:
+- Analytics overview
+- Spin probability configuration
+- Product sync trigger
+- Webhook endpoint reference
+
+---
+
+## Getting Started
+
+### Prerequisites
+- Node.js 20+
+- Docker & Docker Compose
+
+### 1. Clone & install
 ```bash
-stripe listen --forward-to localhost:3000/api/webhook/stripe
+# Frontend dependencies
+npm install
+
+# Backend dependencies
+cd server && npm install
 ```
 
-## Folder Structure
+### 2. Environment
+```bash
+# Root .env
+cp .env.example .env
 
-```text
-app/
-  api/
-    checkout/route.ts
-    products/route.ts
-    session/get/route.ts
-    session/save/route.ts
-    spin/route.ts
-    webhook/stripe/route.ts
-  globals.css
-  layout.tsx
-  page.tsx
-lib/
-  commerce.ts
-  env.ts
-  rewards.ts
-  stripe.ts
-  supabaseAdmin.ts
-  types.ts
-supabase/
-  schema.sql
+# Server .env
+cp server/.env.example server/.env
+# Fill in DATABASE_URL, REDIS_URL, STRIPE keys
 ```
 
-## Security Notes
+### 3. Start with Docker
+```bash
+docker compose up -d
+```
 
-- Frontend prices are never trusted.
-- Checkout reloads products from Supabase and validates required categories.
-- Spin rewards are generated on the backend and saved once with a conditional update.
-- Spin calls are rate limited by hashed IP per hour.
-- Existing pending/paid orders prevent repeated checkout creation for the same gift session.
+### 4. Or start locally
+```bash
+# Terminal 1 — PostgreSQL + Redis (Docker)
+docker compose up postgres redis -d
+
+# Terminal 2 — NestJS backend
+cd server
+npm run prisma:migrate  # first time only
+npm run start:dev
+
+# Terminal 3 — Next.js frontend
+npm run dev
+```
+
+---
+
+## API Reference
+
+### Products
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/products` | List all active products |
+| GET | `/api/products/:id` | Get single product |
+| POST | `/api/products/sync` | Batch upsert from backoffice |
+| PUT | `/api/products/sync/:externalId/stock` | Update stock |
+
+### Boxes
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/boxes` | Create new box session |
+| GET | `/api/boxes/:token` | Get box with selections |
+| PATCH | `/api/boxes/:token` | Update slot selections |
+| GET | `/api/boxes/:token/total` | Get price breakdown |
+
+### Spin
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/spin` | Execute server-side spin |
+
+### Admin
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/analytics` | Platform overview |
+| GET | `/api/admin/spin-config` | Current spin probabilities |
+| PUT | `/api/admin/spin-config` | Update probabilities |
+
+### Webhooks
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/webhooks/stripe` | Stripe payment events |
+| POST | `/api/webhooks/product-sync` | Backoffice product updates |
+
+---
+
+## Swagger Docs
+
+Available at `http://localhost:4000/api/docs` when the backend is running.
+
+---
+
+## Product Model
+
+```typescript
+Product {
+  id, title, description
+  normalPrice: number   // GEL in tetri (100 = 1 ₾)
+  boxPrice: number      // discounted box price
+  images: string[]
+  stock: number
+  active: boolean
+  category: 'main_surprise' | 'sweet_pick' | 'tiny_extra' | 'lucky_bonus'
+  audience: 'for_her' | 'for_him' | 'couple' | 'neutral'
+  vibes: ('romantic' | 'cute' | 'cozy' | 'luxury' | 'funny' | 'soft' | 'gamer' | 'aesthetic')[]
+  tags: string[]
+  externalId: string    // for backoffice sync
+}
+```

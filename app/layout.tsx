@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import Providers from "@/components/Providers";
 
 export const metadata: Metadata = {
   title: "Gamif — Premium Mystery Gift Boxes",
@@ -19,7 +20,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="theme-color" content="#0D0D0D" />
       </head>
-      <body className="bg-[#0D0D0D] text-white antialiased">{children}</body>
+      <body className="bg-[#0D0D0D] text-white antialiased">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

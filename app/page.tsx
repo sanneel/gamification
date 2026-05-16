@@ -3,9 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence, useInView } from "framer-motion";
-import { ArrowRight, Gift, Heart, Sparkles, Star, ChevronRight, ChevronLeft } from "lucide-react";
+import { ArrowRight, Gift, Heart, ShoppingCart, Sparkles, Star, ChevronRight, ChevronLeft } from "lucide-react";
 import { useRef, useState, useEffect } from "react";
 import { springs, ease } from "@/lib/motion";
+import { useCartStore } from "@/lib/stores/cart";
+import { useUIStore } from "@/lib/stores/ui";
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -113,6 +115,9 @@ const FOR_WHO = [
 
 function SiteNav() {
   const [scrolled, setScrolled] = useState(false);
+  const cartItems = useCartStore((s) => s.items);
+  const cartCount = cartItems.reduce((n, i) => n + i.quantity, 0);
+  const openMiniCart = useUIStore((s) => s.openMiniCart);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 36);
@@ -141,6 +146,27 @@ function SiteNav() {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={openMiniCart}
+            className="relative w-9 h-9 rounded-xl flex items-center justify-center text-[#5C4038] hover:text-[#C8445C] hover:bg-[#EDE6DC] transition-all"
+            aria-label="Open cart"
+          >
+            <ShoppingCart className="w-4 h-4" />
+            <AnimatePresence>
+              {cartCount > 0 && (
+                <motion.span
+                  key={cartCount}
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0 }}
+                  className="absolute -top-1 -right-1 w-4 h-4 text-white text-[9px] font-black rounded-full flex items-center justify-center"
+                  style={{ background: "#C8445C" }}
+                >
+                  {cartCount}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </button>
           <Link
             href="/build-a-box"
             className="btn-rose px-5 py-2 rounded-xl text-sm font-bold inline-flex items-center gap-1.5"

@@ -4,11 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence, useAnimate } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check, ChevronRight, Gift, Lock, MessageSquare, Sparkles, Zap } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ChevronRight, Gift, Lock, MessageSquare, ShoppingCart, Sparkles, Zap } from "lucide-react";
 import ProductCard from "@/components/ProductCard";
 import LuckySpinWheel from "@/components/LuckySpinWheel";
 import { type Product, type ProductCategory, type SpinReward, BOX_SLOTS, formatGELSimple } from "@/lib/types";
 import { springs, ease, fadeUp } from "@/lib/motion";
+import { useCartStore } from "@/lib/stores/cart";
+import { useUIStore } from "@/lib/stores/ui";
 
 // ─── Demo products ────────────────────────────────────────────────────────────
 
@@ -45,11 +47,12 @@ function BoxSlotCard({
 }) {
   const [scope, animate] = useAnimate();
 
+  const selectionId = selection?.id;
   useEffect(() => {
-    if (selection && scope.current) {
+    if (selectionId && scope.current) {
       animate(scope.current, { scale: [1.15, 0.95, 1.02, 1] }, { duration: 0.5, ease: [0.34, 1.56, 0.64, 1] });
     }
-  }, [selection?.id, animate, scope]);
+  }, [selectionId, animate, scope]);
 
   return (
     <motion.div
@@ -406,6 +409,9 @@ export default function BuildABoxPage() {
   const [giftMessage, setGiftMessage] = useState("");
   const [recipientName, setRecipientName] = useState("");
   const prevStepRef = useRef(stepIndex);
+  const cartItems = useCartStore((s) => s.items);
+  const cartCount = cartItems.reduce((n, i) => n + i.quantity, 0);
+  const openMiniCart = useUIStore((s) => s.openMiniCart);
 
   const currentStep = STEPS[stepIndex];
   const direction = stepIndex > prevStepRef.current ? 1 : -1;
@@ -484,7 +490,8 @@ export default function BuildABoxPage() {
   function handleRewardReceived(reward: SpinReward) {
     setSpinReward(reward);
     setShowSpinWheel(false);
-    setStepIndex(STEPS.indexOf("spin"));
+    // Advance past spin → review so user lands on checkout
+    setStepIndex(STEPS.indexOf("review"));
   }
 
   const subtotal = useMemo(() => Object.values(selections).reduce((s, p) => s + (p?.boxPrice ?? 0), 0), [selections]);
@@ -499,9 +506,33 @@ export default function BuildABoxPage() {
           <span className="hidden sm:inline">Shop</span>
         </Link>
         <Link href="/" className="font-display text-xl font-bold text-white">gamif<span className="text-accent">.</span></Link>
-        {subtotal > 0 && (
-          <span className="text-accent font-black text-sm">{formatGELSimple(subtotal)}</span>
-        )}
+        <div className="flex items-center gap-3">
+          {subtotal > 0 && (
+            <span className="text-accent font-black text-sm hidden sm:block">{formatGELSimple(subtotal)}</span>
+          )}
+          <motion.button
+            onClick={openMiniCart}
+            whileHover={{ scale: 1.06 }}
+            whileTap={{ scale: 0.94 }}
+            className="relative w-9 h-9 glass border border-white/10 rounded-xl flex items-center justify-center text-white/50 hover:text-white hover:border-white/25 transition-colors"
+            aria-label="Open cart"
+          >
+            <ShoppingCart className="w-4 h-4" />
+            <AnimatePresence>
+              {cartCount > 0 && (
+                <motion.span
+                  key={cartCount}
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0 }}
+                  className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-accent text-white text-[9px] font-black rounded-full flex items-center justify-center"
+                >
+                  {cartCount}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </motion.button>
+        </div>
       </nav>
 
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -614,6 +645,7 @@ export default function BuildABoxPage() {
                       onAddToBox={selectProduct}
                       isInBox={selections[currentStep as ProductCategory]?.id === product.id}
                       showBoxAction
+                      inBuilder
                     />
                   ))}
                 </div>
@@ -733,7 +765,7 @@ export default function BuildABoxPage() {
           onRewardReceived={handleRewardReceived}
           onClose={() => {
             setShowSpinWheel(false);
-            if (spinReward) setStepIndex(STEPS.indexOf("spin"));
+            if (spinReward) setStepIndex(STEPS.indexOf("review"));
           }}
         />
       )}

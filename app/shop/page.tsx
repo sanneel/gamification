@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Filter, Gift, Search, SlidersHorizontal, X } from "lucide-react";
+import { Filter, Gift, Search, ShoppingCart, SlidersHorizontal, X } from "lucide-react";
 import ProductCard from "@/components/ProductCard";
 import { type Product, type ProductCategory, type Audience, type Vibe } from "@/lib/types";
+import { useCartStore } from "@/lib/stores/cart";
+import { useUIStore } from "@/lib/stores/ui";
 
 const DEMO_PRODUCTS: Product[] = [
   { id: "p1", title: "Preserved Rose Box", description: "Velvet-toned roses for a breathtaking opening moment.", normalPrice: 4900, boxPrice: 3900, images: ["https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=600&q=80"], stock: 12, active: true, category: "main_surprise", audience: "for_her", vibes: ["romantic", "luxury"], tags: [] },
@@ -47,12 +49,38 @@ const CATEGORIES: { id: ProductCategory; label: string }[] = [
 ];
 
 export default function ShopPage() {
+  return (
+    <Suspense fallback={<ShopSkeleton />}>
+      <ShopContent />
+    </Suspense>
+  );
+}
+
+function ShopSkeleton() {
+  return (
+    <div className="min-h-screen bg-[#0D0D0D]">
+      <div className="sticky top-0 z-40 bg-[#0D0D0D]/90 backdrop-blur-xl border-b border-white/5 px-4 py-4 h-[65px]" />
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="aspect-[3/4] rounded-2xl bg-card animate-pulse" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ShopContent() {
   const searchParams = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [boxItems, setBoxItems] = useState<Product[]>([]);
+  const cartItems = useCartStore((s) => s.items);
+  const cartCount = cartItems.reduce((n, i) => n + i.quantity, 0);
+  const openMiniCart = useUIStore((s) => s.openMiniCart);
   const [selectedAudience, setSelectedAudience] = useState<Audience | null>(
     (searchParams.get("audience") as Audience | null) ?? null,
   );
@@ -135,6 +163,28 @@ export default function ShopPage() {
               Box ({boxItems.length}/3)
             </Link>
           )}
+          <motion.button
+            onClick={openMiniCart}
+            whileHover={{ scale: 1.06 }}
+            whileTap={{ scale: 0.94 }}
+            className="relative w-10 h-10 glass border border-white/10 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:border-white/25 transition-colors shrink-0"
+            aria-label="Open cart"
+          >
+            <ShoppingCart className="w-4 h-4" />
+            <AnimatePresence>
+              {cartCount > 0 && (
+                <motion.span
+                  key={cartCount}
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0 }}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-accent text-white text-[10px] font-black rounded-full flex items-center justify-center"
+                >
+                  {cartCount > 9 ? "9+" : cartCount}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </motion.button>
         </div>
 
         {/* Filters panel */}

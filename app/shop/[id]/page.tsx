@@ -7,6 +7,8 @@ import { motion, AnimatePresence, useScroll, useTransform, useSpring } from "fra
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, Gift, ShoppingCart, Sparkles, Star, Zap } from "lucide-react";
 import { type Product, formatGELSimple, savingsPct, savings } from "@/lib/types";
 import { springs, ease, fadeUp, viewport } from "@/lib/motion";
+import { useCartStore } from "@/lib/stores/cart";
+import { useUIStore } from "@/lib/stores/ui";
 
 const DEMO: Record<string, Product> = {
   p1: {
@@ -21,21 +23,19 @@ const DEMO: Record<string, Product> = {
   },
 };
 
-// Flying particle that shoots from button to corner
 function FlyParticle({ trigger, origin }: { trigger: boolean; origin: { x: number; y: number } | null }) {
   if (!trigger || !origin) return null;
   return (
     <motion.div
-      className="fixed z-[90] pointer-events-none"
-      style={{ left: origin.x, top: origin.y, width: 12, height: 12, borderRadius: "50%", background: "#FF2D78" }}
+      className="fixed z-[90] pointer-events-none rounded-full"
+      style={{ left: origin.x, top: origin.y, width: 10, height: 10, background: "#FF2D78" }}
       initial={{ opacity: 1, scale: 1, x: 0, y: 0 }}
-      animate={{ opacity: 0, scale: 0.3, x: 60, y: -80 }}
-      transition={{ duration: 0.6, ease: ease.expo }}
+      animate={{ opacity: 0, scale: 0.2, x: 50, y: -70 }}
+      transition={{ duration: 0.55, ease: ease.expo }}
     />
   );
 }
 
-// Floating sparkle label that appears on "Add to Box"
 function FloatLabel({ show }: { show: boolean }) {
   return (
     <AnimatePresence>
@@ -45,19 +45,15 @@ function FloatLabel({ show }: { show: boolean }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
+          transition={{ duration: 0.15 }}
         >
           {["✨", "💖", "⭐", "🌟", "✨"].map((s, i) => (
             <motion.span
               key={i}
               className="absolute text-sm"
               initial={{ opacity: 1, scale: 0, x: 0, y: 0 }}
-              animate={{
-                opacity: 0, scale: 1.5,
-                x: (i - 2) * 28 + (Math.random() - 0.5) * 20,
-                y: -40 - Math.random() * 30,
-              }}
-              transition={{ duration: 0.8, delay: i * 0.05, ease: ease.expo }}
+              animate={{ opacity: 0, scale: 1.4, x: (i - 2) * 28, y: -40 - i * 5 }}
+              transition={{ duration: 0.75, delay: i * 0.05, ease: ease.expo }}
             >
               {s}
             </motion.span>
@@ -73,16 +69,20 @@ export default function ProductPage({ params }: { params: { id: string } }) {
   const [loading, setLoading] = useState(true);
   const [activeImg, setActiveImg] = useState(0);
   const [addedToBox, setAddedToBox] = useState(false);
+  const [addedToCart, setAddedToCart] = useState(false);
   const [sparkleActive, setSparkleActive] = useState(false);
   const [flyParticle, setFlyParticle] = useState(false);
   const [flyOrigin, setFlyOrigin] = useState<{ x: number; y: number } | null>(null);
   const addBtnRef = useRef<HTMLButtonElement>(null);
   const heroRef = useRef<HTMLDivElement>(null);
 
+  const addToCart = useCartStore((s) => s.addItem);
+  const cartItems = useCartStore((s) => s.items);
+  const cartCount = cartItems.reduce((n, i) => n + i.quantity, 0);
+  const openMiniCart = useUIStore((s) => s.openMiniCart);
+
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
   const heroScale = useSpring(useTransform(scrollYProgress, [0, 1], [1, 1.06]), { stiffness: 120, damping: 30 });
-  const heroBlur = useTransform(scrollYProgress, [0, 0.6], [0, 8]);
-  const heroOpacity = useTransform(scrollYProgress, [0, 0.7], [1, 0.3]);
 
   useEffect(() => {
     fetch(`/api/products/${params.id}`)
@@ -97,7 +97,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     setFlyOrigin({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
     setFlyParticle(true);
-    setTimeout(() => setFlyParticle(false), 700);
+    setTimeout(() => setFlyParticle(false), 600);
 
     const stored = JSON.parse(localStorage.getItem("box_items") ?? "[]") as Product[];
     const next = stored.filter((p) => p.category !== product.category).concat(product).slice(0, 3);
@@ -105,18 +105,31 @@ export default function ProductPage({ params }: { params: { id: string } }) {
 
     setAddedToBox(true);
     setSparkleActive(true);
-    setTimeout(() => setSparkleActive(false), 1000);
-    setTimeout(() => setAddedToBox(false), 3200);
+    setTimeout(() => setSparkleActive(false), 900);
+    setTimeout(() => setAddedToBox(false), 3000);
+  }
+
+  function handleAddToCart(e: React.MouseEvent) {
+    if (!product) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setFlyOrigin({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+    setFlyParticle(true);
+    setTimeout(() => setFlyParticle(false), 600);
+
+    addToCart(product);
+    setAddedToCart(true);
+    setTimeout(() => setAddedToCart(false), 2200);
+    setTimeout(() => openMiniCart(), 300);
   }
 
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0D0D0D] flex items-center justify-center">
         <motion.div
-          className="w-14 h-14 rounded-full"
-          style={{ border: "3px solid transparent", borderTopColor: "#FF2D78" }}
+          className="w-12 h-12 rounded-full"
+          style={{ border: "3px solid transparent", borderTopColor: "#FF2D78", borderRightColor: "rgba(255,45,120,0.3)" }}
           animate={{ rotate: 360 }}
-          transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
+          transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }}
         />
       </div>
     );
@@ -124,9 +137,10 @@ export default function ProductPage({ params }: { params: { id: string } }) {
 
   if (!product) {
     return (
-      <div className="min-h-screen bg-[#0D0D0D] flex flex-col items-center justify-center gap-4">
-        <p className="text-white/50 text-lg">Product not found.</p>
-        <Link href="/shop" className="text-accent font-bold hover:underline">Back to Shop</Link>
+      <div className="min-h-screen bg-[#0D0D0D] flex flex-col items-center justify-center gap-4 text-center px-6">
+        <div className="text-5xl mb-2">🔍</div>
+        <p className="text-white/50 text-lg font-bold">Product not found</p>
+        <Link href="/shop" className="text-accent font-bold hover:underline text-sm">← Back to Shop</Link>
       </div>
     );
   }
@@ -140,20 +154,44 @@ export default function ProductPage({ params }: { params: { id: string } }) {
 
       {/* Nav */}
       <nav className="sticky top-0 z-50 glass-strong border-b border-white/5 px-5 py-4 flex items-center gap-3">
-        <Link href="/shop" className="flex items-center gap-2 text-white/40 hover:text-white transition-colors text-sm">
+        <Link href="/shop" className="flex items-center gap-2 text-white/40 hover:text-white transition-colors text-sm shrink-0">
           <ArrowLeft className="w-4 h-4" />
           <span className="hidden sm:inline">Shop</span>
         </Link>
-        <span className="text-white/15">/</span>
-        <span className="text-white/60 text-sm truncate max-w-[200px]">{product.title}</span>
-        <div className="ml-auto">
-          <Link href="/" className="font-display text-xl font-bold text-white">gamif<span className="text-accent">.</span></Link>
+        <span className="text-white/12">/</span>
+        <span className="text-white/50 text-sm truncate flex-1 min-w-0">{product.title}</span>
+        <div className="flex items-center gap-2 shrink-0">
+          <motion.button
+            onClick={openMiniCart}
+            whileHover={{ scale: 1.06 }}
+            whileTap={{ scale: 0.94 }}
+            className="relative w-9 h-9 glass border border-white/10 rounded-xl flex items-center justify-center text-white/50 hover:text-white transition-colors"
+            aria-label="Open cart"
+          >
+            <ShoppingCart className="w-4 h-4" />
+            <AnimatePresence>
+              {cartCount > 0 && (
+                <motion.span
+                  key={cartCount}
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0 }}
+                  className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-accent text-white text-[9px] font-black rounded-full flex items-center justify-center"
+                >
+                  {cartCount}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </motion.button>
+          <Link href="/" className="font-display text-xl font-bold text-white hidden sm:block">
+            gamif<span className="text-accent">.</span>
+          </Link>
         </div>
       </nav>
 
-      {/* ── HERO IMAGE (mobile: full-bleed, desktop: left column) ──────────── */}
+      {/* Mobile hero */}
       <div className="lg:hidden">
-        <div ref={heroRef} className="relative w-full aspect-square overflow-hidden">
+        <div ref={heroRef} className="relative w-full aspect-[4/3] overflow-hidden">
           <motion.div className="absolute inset-0" style={{ scale: heroScale }}>
             <AnimatePresence mode="wait">
               <motion.div
@@ -162,17 +200,13 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 initial={{ opacity: 0, scale: 1.08 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.55, ease: ease.expo }}
+                transition={{ duration: 0.5, ease: ease.expo }}
               >
-                <Image src={product.images[activeImg] ?? product.images[0]} alt={product.title} fill className="object-cover" priority />
+                <Image src={product.images[activeImg] ?? product.images[0]} alt={product.title} fill className="object-cover" priority sizes="100vw" />
               </motion.div>
             </AnimatePresence>
           </motion.div>
-
-          {/* Gradient overlay bottom */}
-          <div className="absolute bottom-0 inset-x-0 h-2/5 bg-gradient-to-t from-[#0D0D0D] to-transparent pointer-events-none" />
-
-          {/* Savings badge */}
+          <div className="absolute bottom-0 inset-x-0 h-1/2 bg-gradient-to-t from-[#0D0D0D] via-[#0D0D0D]/30 to-transparent pointer-events-none" />
           {pct >= 5 && (
             <motion.div
               className="absolute top-4 left-4 text-white text-xs font-black px-3 py-1.5 rounded-full"
@@ -184,12 +218,10 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               -{pct}% in Box
             </motion.div>
           )}
-
-          {/* Image nav */}
           {product.images.length > 1 && (
-            <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-2 z-10">
+            <div className="absolute bottom-5 left-0 right-0 flex justify-center gap-1.5 z-10">
               {product.images.map((_, i) => (
-                <button key={i} onClick={() => setActiveImg(i)}
+                <button key={i} onClick={() => setActiveImg(i)} aria-label={`Image ${i + 1}`}
                   className={`rounded-full transition-all ${i === activeImg ? "w-5 h-2 bg-white" : "w-2 h-2 bg-white/30"}`}
                 />
               ))}
@@ -201,89 +233,98 @@ export default function ProductPage({ params }: { params: { id: string } }) {
       <div className="max-w-6xl mx-auto px-4 py-8 lg:py-16">
         <div className="grid lg:grid-cols-2 gap-10 lg:gap-20 items-start">
 
-          {/* ── Desktop Image Column ─────────────────────────────────────── */}
+          {/* Desktop image gallery */}
           <div className="hidden lg:block space-y-4">
-            <motion.div
-              className="relative aspect-square rounded-3xl overflow-hidden bg-card cursor-zoom-in"
-              layoutId={`product-img-${product.id}`}
-              whileHover={{ scale: 1.01 }}
-              transition={springs.gentle}
-            >
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeImg}
-                  className="absolute inset-0"
-                  initial={{ opacity: 0, scale: 1.06 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.5, ease: ease.expo }}
-                >
-                  <Image src={product.images[activeImg] ?? product.images[0]} alt={product.title} fill className="object-cover" priority />
-                </motion.div>
-              </AnimatePresence>
+            <div className="group relative">
+              <motion.div
+                className="relative aspect-square rounded-3xl overflow-hidden bg-card cursor-zoom-in"
+                whileHover={{ scale: 1.01 }}
+                transition={springs.gentle}
+              >
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeImg}
+                    className="absolute inset-0"
+                    initial={{ opacity: 0, scale: 1.06 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.45, ease: ease.expo }}
+                  >
+                    <Image src={product.images[activeImg] ?? product.images[0]} alt={product.title} fill className="object-cover" priority sizes="600px" />
+                  </motion.div>
+                </AnimatePresence>
 
-              {pct >= 5 && (
-                <motion.div
-                  className="absolute top-5 left-5 text-white text-xs font-black px-4 py-2 rounded-full z-10"
-                  style={{ background: "linear-gradient(135deg, #FF2D78, #7C3AED)" }}
-                  initial={{ scale: 0, rotate: -12 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  transition={{ ...springs.bouncy, delay: 0.4 }}
-                >
-                  -{pct}% in Box
-                </motion.div>
-              )}
+                {pct >= 5 && (
+                  <motion.div
+                    className="absolute top-5 left-5 text-white text-xs font-black px-4 py-2 rounded-full z-10"
+                    style={{ background: "linear-gradient(135deg, #FF2D78, #7C3AED)" }}
+                    initial={{ scale: 0, rotate: -12 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ ...springs.bouncy, delay: 0.4 }}
+                  >
+                    -{pct}% in Box
+                  </motion.div>
+                )}
 
-              {product.images.length > 1 && (
-                <>
-                  <button onClick={() => setActiveImg((i) => (i - 1 + product.images.length) % product.images.length)}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 glass rounded-full border border-white/10 flex items-center justify-center hover:bg-white/20 transition-all opacity-0 group-hover:opacity-100">
-                    <ChevronLeft className="w-5 h-5 text-white" />
-                  </button>
-                  <button onClick={() => setActiveImg((i) => (i + 1) % product.images.length)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 glass rounded-full border border-white/10 flex items-center justify-center hover:bg-white/20 transition-all opacity-0 group-hover:opacity-100">
-                    <ChevronRight className="w-5 h-5 text-white" />
-                  </button>
-                </>
-              )}
-            </motion.div>
+                {product.images.length > 1 && (
+                  <>
+                    <motion.button
+                      onClick={() => setActiveImg((i) => (i - 1 + product.images.length) % product.images.length)}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 glass rounded-full border border-white/10 flex items-center justify-center hover:bg-white/20 transition-all opacity-0 group-hover:opacity-100"
+                      whileTap={{ scale: 0.9 }}
+                    >
+                      <ChevronLeft className="w-5 h-5 text-white" />
+                    </motion.button>
+                    <motion.button
+                      onClick={() => setActiveImg((i) => (i + 1) % product.images.length)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 glass rounded-full border border-white/10 flex items-center justify-center hover:bg-white/20 transition-all opacity-0 group-hover:opacity-100"
+                      whileTap={{ scale: 0.9 }}
+                    >
+                      <ChevronRight className="w-5 h-5 text-white" />
+                    </motion.button>
+                  </>
+                )}
+              </motion.div>
+            </div>
 
             {product.images.length > 1 && (
               <div className="flex gap-3">
                 {product.images.map((img, i) => (
-                  <motion.button key={i} onClick={() => setActiveImg(i)}
+                  <motion.button
+                    key={i}
+                    onClick={() => setActiveImg(i)}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    className={`relative w-20 h-20 rounded-2xl overflow-hidden border-2 transition-all ${i === activeImg ? "border-accent shadow-[0_0_16px_#FF2D7850]" : "border-white/10 opacity-50 hover:opacity-80"}`}>
-                    <Image src={img} alt="" fill className="object-cover" />
+                    className={`relative w-20 h-20 rounded-2xl overflow-hidden border-2 transition-all ${
+                      i === activeImg ? "border-accent shadow-[0_0_16px_rgba(255,45,120,0.4)]" : "border-white/10 opacity-50 hover:opacity-80"
+                    }`}
+                  >
+                    <Image src={img} alt="" fill className="object-cover" sizes="80px" />
                   </motion.button>
                 ))}
               </div>
             )}
 
-            {/* Ambient glow behind image */}
-            <div className="relative h-8 pointer-events-none">
-              <div className="absolute inset-x-8 h-20 -top-6 bg-accent/10 blur-2xl rounded-full" />
+            {/* Ambient glow */}
+            <div className="relative h-4 pointer-events-none">
+              <div className="absolute inset-x-12 h-16 -top-4 bg-accent/8 blur-3xl rounded-full" />
             </div>
           </div>
 
-          {/* ── Info Column ──────────────────────────────────────────────── */}
+          {/* Info column */}
           <motion.div
-            className="space-y-7"
+            className="space-y-6"
             initial="hidden"
             animate="visible"
-            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.07 } } }}
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
           >
-            {/* Tags */}
+            {/* Vibe tags */}
             <motion.div className="flex gap-2 flex-wrap" variants={fadeUp}>
               {product.vibes.slice(0, 3).map((v) => (
                 <span key={v} className="text-[10px] font-black uppercase tracking-wider text-violet-2 bg-violet/10 px-3 py-1 rounded-full border border-violet/20">
                   {v}
                 </span>
               ))}
-              <span className="text-[10px] font-black uppercase tracking-wider text-white/25 bg-white/5 px-3 py-1 rounded-full border border-white/10">
-                {product.category.replace(/_/g, " ")}
-              </span>
             </motion.div>
 
             {/* Title */}
@@ -295,19 +336,16 @@ export default function ProductPage({ params }: { params: { id: string } }) {
             </motion.h1>
 
             {/* Social proof */}
-            <motion.div className="flex items-center gap-3" variants={fadeUp}>
+            <motion.div className="flex items-center gap-3 flex-wrap" variants={fadeUp}>
               <div className="flex">
-                {[1,2,3,4,5].map((s) => (
-                  <Star key={s} className="w-4 h-4 fill-gold text-gold" />
-                ))}
+                {[1,2,3,4,5].map((s) => <Star key={s} className="w-4 h-4 fill-gold text-gold" />)}
               </div>
               <span className="text-white/40 text-sm">4.9 · 847 gifted</span>
-              <span className="text-white/20">·</span>
               <span className="text-emerald text-sm font-bold">❤️ Top pick this week</span>
             </motion.div>
 
             {/* Description */}
-            <motion.p className="text-white/60 text-lg leading-relaxed" variants={fadeUp}>
+            <motion.p className="text-white/60 text-base leading-relaxed" variants={fadeUp}>
               {product.description}
             </motion.p>
 
@@ -320,54 +358,73 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                   : product.audience === "couple" ? "💑 Couples"
                   : "🎁 Anyone"}
               </span>
+              {product.stock > 0 && product.stock <= 5 && (
+                <span className="text-gold text-xs font-bold flex items-center gap-1">
+                  <motion.span
+                    className="inline-block w-1.5 h-1.5 rounded-full bg-gold"
+                    animate={{ opacity: [1, 0.3, 1] }}
+                    transition={{ duration: 1, repeat: Infinity }}
+                  />
+                  Only {product.stock} left!
+                </span>
+              )}
             </motion.div>
 
-            {/* ── Dual Pricing Block ───────────────────────────────────── */}
+            {/* Dual pricing block */}
             <motion.div
               className="rounded-3xl overflow-hidden"
               variants={fadeUp}
               style={{ border: "1px solid rgba(255,45,120,0.15)" }}
             >
-              {/* Normal */}
-              <div className="flex items-center justify-between px-6 py-5 border-b border-white/5 bg-white/2">
+              {/* Normal price row */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-white/5"
+                style={{ background: "rgba(255,255,255,0.02)" }}>
                 <div>
-                  <p className="text-white/25 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Normal Price</p>
-                  <p className="text-2xl font-bold text-white/40 line-through">{formatGELSimple(product.normalPrice)}</p>
+                  <p className="text-white/25 text-[9px] font-black uppercase tracking-[0.2em] mb-1">Normal Price</p>
+                  <p className="text-xl font-bold text-white/35 line-through">{formatGELSimple(product.normalPrice)}</p>
                 </div>
                 <motion.button
-                  whileHover={{ scale: 1.03, borderColor: "rgba(255,255,255,0.3)" }}
-                  whileTap={{ scale: 0.97 }}
-                  className="flex items-center gap-2 px-5 py-2.5 border border-white/12 rounded-xl text-xs font-bold text-white/45 hover:text-white/70 transition-all"
+                  onClick={handleAddToCart}
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                    addedToCart
+                      ? "bg-emerald/15 border border-emerald/40 text-emerald"
+                      : "border border-white/12 text-white/45 hover:text-white hover:border-white/30"
+                  }`}
                 >
-                  <ShoppingCart className="w-3.5 h-3.5" />
-                  Buy Normally
+                  {addedToCart ? (
+                    <><Check className="w-3.5 h-3.5" /> Added!</>
+                  ) : (
+                    <><ShoppingCart className="w-3.5 h-3.5" /> Buy Normally</>
+                  )}
                 </motion.button>
               </div>
 
-              {/* Box price */}
-              <div className="relative px-6 py-6" style={{ background: "linear-gradient(135deg, rgba(255,45,120,0.08) 0%, rgba(124,58,237,0.08) 100%)" }}>
+              {/* Box price row */}
+              <div className="relative px-5 py-5"
+                style={{ background: "linear-gradient(135deg, rgba(255,45,120,0.07) 0%, rgba(124,58,237,0.07) 100%)" }}>
+                {/* Shimmer sweep */}
                 <motion.div
                   className="absolute inset-0 pointer-events-none"
-                  style={{ background: "linear-gradient(90deg, transparent, rgba(255,45,120,0.05), transparent)" }}
+                  style={{ background: "linear-gradient(90deg, transparent, rgba(255,45,120,0.06), transparent)" }}
                   animate={{ x: ["-100%", "200%"] }}
-                  transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
+                  transition={{ duration: 3.5, repeat: Infinity, repeatDelay: 2.5 }}
                 />
-                <div className="relative flex items-center justify-between gap-4">
+                <div className="relative flex items-end justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="box-price-badge flex items-center gap-1">
-                        <Sparkles className="w-2.5 h-2.5" />
-                        Box Price
-                      </span>
-                    </div>
-                    <p className="text-5xl font-black text-white">
+                    <span className="box-price-badge flex items-center gap-1 w-fit mb-2.5">
+                      <Sparkles className="w-2.5 h-2.5" />
+                      Box Price
+                    </span>
+                    <p className="text-5xl font-black text-white leading-none">
                       {formatGELSimple(product.boxPrice)}
                     </p>
                     <p className="text-accent text-sm font-bold mt-1.5">
-                      You save {formatGELSimple(saved)} ({pct}%) ✨
+                      Save {formatGELSimple(saved)} ({pct}%) ✨
                     </p>
                   </div>
-                  <div className="relative flex-shrink-0">
+                  <div className="relative shrink-0">
                     <FloatLabel show={sparkleActive} />
                     <motion.button
                       ref={addBtnRef}
@@ -376,7 +433,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                       whileTap={{ scale: 0.93 }}
                       className={`flex items-center gap-2 px-5 py-3.5 rounded-2xl text-sm font-black uppercase tracking-wider transition-all ${
                         addedToBox
-                          ? "bg-emerald/15 border border-emerald/40 text-emerald shadow-[0_0_24px_#10B98130]"
+                          ? "bg-emerald/15 border border-emerald/40 text-emerald shadow-[0_0_20px_rgba(16,185,129,0.25)]"
                           : "btn-dopamine"
                       }`}
                     >
@@ -399,36 +456,22 @@ export default function ProductPage({ params }: { params: { id: string } }) {
               </div>
             </motion.div>
 
-            {/* Stock warning */}
-            <AnimatePresence>
-              {product.stock > 0 && product.stock <= 5 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8, height: 0 }}
-                  animate={{ opacity: 1, y: 0, height: "auto" }}
-                  className="flex items-center gap-2 text-gold text-sm font-bold"
-                >
-                  <motion.div
-                    className="w-2 h-2 rounded-full bg-gold"
-                    animate={{ opacity: [1, 0.3, 1] }}
-                    transition={{ duration: 1, repeat: Infinity }}
-                  />
-                  Only {product.stock} left — selling fast!
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Box CTA */}
+            {/* Box CTA link */}
             <motion.div variants={fadeUp}>
-              <Link href="/build-a-box"
-                className="flex items-center justify-center gap-2 w-full py-3.5 glass border border-white/8 rounded-2xl text-sm font-bold text-white/50 hover:text-white hover:border-white/20 transition-all">
-                <Gift className="w-4 h-4" />
-                Open the Gift Box Builder
-                <span className="ml-auto text-white/25">→</span>
+              <Link
+                href="/build-a-box"
+                className="flex items-center justify-between w-full py-3.5 px-5 glass border border-white/8 rounded-2xl text-sm font-bold text-white/50 hover:text-white hover:border-white/20 transition-all"
+              >
+                <div className="flex items-center gap-2">
+                  <Gift className="w-4 h-4" />
+                  Open the Gift Box Builder
+                </div>
+                <span className="text-white/25">→</span>
               </Link>
             </motion.div>
 
             {/* Trust badges */}
-            <motion.div className="grid grid-cols-3 gap-3" variants={fadeUp} viewport={viewport}>
+            <motion.div className="grid grid-cols-3 gap-3" variants={fadeUp}>
               {[
                 { icon: "🔒", label: "Secure Checkout" },
                 { icon: "🚚", label: "Fast Delivery" },
@@ -437,7 +480,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
                 <motion.div
                   key={b.label}
                   className="glass border border-white/5 rounded-2xl py-4 flex flex-col items-center gap-1.5"
-                  whileHover={{ scale: 1.03, borderColor: "rgba(255,255,255,0.12)" }}
+                  whileHover={{ scale: 1.04, borderColor: "rgba(255,255,255,0.12)" }}
                   transition={springs.snappy}
                 >
                   <span className="text-2xl">{b.icon}</span>
@@ -448,7 +491,7 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           </motion.div>
         </div>
 
-        {/* ── You might also love (placeholder) ────────────────────────────── */}
+        {/* Complete the vibe */}
         <motion.div
           className="mt-20 pt-12 border-t border-white/5"
           initial="hidden"
@@ -456,26 +499,29 @@ export default function ProductPage({ params }: { params: { id: string } }) {
           viewport={viewport}
           variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
         >
-          <motion.h2 className="text-2xl font-display font-bold text-white mb-8" variants={fadeUp}>
+          <motion.h2 className="font-display text-2xl font-bold text-white mb-8" variants={fadeUp}>
             Complete the vibe
           </motion.h2>
-          <motion.div className="grid grid-cols-2 md:grid-cols-4 gap-4" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}>
-            {["Sweet Pick", "Tiny Extra", "Main Surprise", "Lucky Bonus"].map((slot) => (
+          <motion.div
+            className="grid grid-cols-2 md:grid-cols-4 gap-4"
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}
+          >
+            {[
+              { slot: "Sweet Pick", emoji: "🍬" },
+              { slot: "Tiny Extra", emoji: "✨" },
+              { slot: "Main Surprise", emoji: "🎁" },
+              { slot: "Lucky Bonus", emoji: "🌟" },
+            ].map(({ slot, emoji }) => (
               <motion.div
                 key={slot}
                 variants={fadeUp}
                 className="glass border border-white/5 rounded-2xl p-5 flex flex-col items-center gap-2 text-center"
-                whileHover={{ scale: 1.03, borderColor: "rgba(255,45,120,0.2)" }}
+                whileHover={{ scale: 1.04, borderColor: "rgba(255,45,120,0.18)" }}
                 transition={springs.snappy}
               >
-                <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-2xl">
-                  {slot === "Sweet Pick" ? "🍬" : slot === "Tiny Extra" ? "✨" : slot === "Main Surprise" ? "🎁" : "🌟"}
-                </div>
+                <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-2xl">{emoji}</div>
                 <p className="text-white/50 text-xs font-bold uppercase tracking-wider">{slot}</p>
-                <Link href={`/shop?category=${slot.toLowerCase().replace(" ", "_")}`}
-                  className="text-accent text-xs font-bold hover:underline">
-                  Browse →
-                </Link>
+                <Link href="/shop" className="text-accent text-xs font-bold hover:underline">Browse →</Link>
               </motion.div>
             ))}
           </motion.div>

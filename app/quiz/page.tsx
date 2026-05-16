@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ArrowRight, Sparkles } from "lucide-react";
 import { springs, ease } from "@/lib/motion";
+import AmbientBg from "@/components/AmbientBg";
 
 // ─── Quiz Data ────────────────────────────────────────────────────────────────
 
@@ -193,13 +194,11 @@ export default function QuizPage() {
 
   if (result) {
     return (
-      <div className="min-h-screen bg-[#0D0D0D] flex flex-col items-center justify-center px-6 py-16">
-        {/* Ambient glow */}
+      <div className="relative min-h-screen bg-ink flex flex-col items-center justify-center px-6 py-16 overflow-hidden">
+        <AmbientBg variant="rose" />
         <div className="absolute inset-0 pointer-events-none">
-          <div
-            className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full blur-[120px] opacity-25"
-            style={{ background: result.color }}
-          />
+          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] rounded-full blur-[120px] opacity-20"
+            style={{ background: result.color }} />
         </div>
 
         <motion.div
@@ -304,7 +303,8 @@ export default function QuizPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0D0D0D] flex flex-col">
+    <div className="relative min-h-screen bg-ink flex flex-col overflow-hidden">
+      <AmbientBg variant="violet" />
       {/* Nav */}
       <nav className="px-5 py-5 flex items-center justify-between">
         <button

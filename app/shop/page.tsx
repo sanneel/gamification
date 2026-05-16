@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Filter, Gift, Search, ShoppingCart, SlidersHorizontal, X } from "lucide-react";
 import ProductCard from "@/components/ProductCard";
+import AmbientBg from "@/components/AmbientBg";
 import { type Product, type ProductCategory, type Audience, type Vibe } from "@/lib/types";
 import { useCartStore } from "@/lib/stores/cart";
 import { useUIStore } from "@/lib/stores/ui";
@@ -58,8 +59,8 @@ export default function ShopPage() {
 
 function ShopSkeleton() {
   return (
-    <div className="min-h-screen bg-[#0D0D0D]">
-      <div className="sticky top-0 z-40 bg-[#0D0D0D]/90 backdrop-blur-xl border-b border-white/5 px-4 py-4 h-[65px]" />
+    <div className="min-h-screen bg-ink">
+      <div className="sticky top-0 z-40 border-b border-white/5 px-4 py-4 h-[65px]" style={{ background: "rgba(8,8,16,0.88)" }} />
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -122,9 +123,10 @@ function ShopContent() {
   const hasFilters = selectedAudience || selectedVibes.length || selectedCategory;
 
   return (
-    <div className="min-h-screen bg-[#0D0D0D]">
+    <div className="relative min-h-screen bg-ink">
+      <AmbientBg variant="dark" />
       {/* Sticky header */}
-      <div className="sticky top-0 z-40 bg-[#0D0D0D]/90 backdrop-blur-xl border-b border-white/5 px-4 py-4">
+      <div className="sticky top-0 z-40 border-b border-white/5 px-4 py-4" style={{ background: "rgba(8,8,16,0.88)", backdropFilter: "blur(24px)" }}>
         <div className="max-w-7xl mx-auto flex items-center gap-3">
           <Link href="/" className="font-display text-xl font-bold text-white shrink-0">
             gamif<span className="text-accent">.</span>

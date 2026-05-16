@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProductCategory {
+  main_surprise
+  sweet_pick
+  tiny_extra
+  lucky_bonus
+}
+
+enum Audience {
+  for_her
+  for_him
+  couple
+  neutral
+}
+
+enum Vibe {
+  romantic
+  cute
+  cozy
+  luxury
+  funny
+  soft
+  gamer
+  aesthetic
+}
+
+enum BoxStatus {
+  BUILDING
+  COMPLETE
+  PAID
+  FAILED
+}
+
+enum RewardType {
+  free_tiny_gift
+  free_shipping
+  upgraded_gift
+  discount_code
+  hidden_item
+  no_reward
+}
+
+model Product {
+  id          String          @id @default(cuid())
+  title       String
+  description String?
+  normalPrice Int             // GEL in tetri (1 GEL = 100 tetri)
+  boxPrice    Int             // discounted box price in tetri
+  images      String[]
+  stock       Int             @default(0)
+  active      Boolean         @default(true)
+  category    ProductCategory
+  audience    Audience        @default(neutral)
+  vibes       Vibe[]
+  tags        String[]
+  externalId  String?         @unique
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  mainSurpriseBoxes GiftBox[] @relation("MainSurprise")
+  sweetPickBoxes    GiftBox[] @relation("SweetPick")
+  tinyExtraBoxes    GiftBox[] @relation("TinyExtra")
+
+  @@index([category, active])
+  @@index([externalId])
+}
+
+model GiftBox {
+  id            String      @id @default(cuid())
+  sessionToken  String      @unique @default(cuid())
+  userId        String?
+
+  mainSurpriseId  String?
+  mainSurprise    Product?  @relation("MainSurprise", fields: [mainSurpriseId], references: [id])
+
+  sweetPickId     String?
+  sweetPick       Product?  @relation("SweetPick", fields: [sweetPickId], references: [id])
+
+  tinyExtraId     String?
+  tinyExtra       Product?  @relation("TinyExtra", fields: [tinyExtraId], references: [id])
+
+  spinRewardId    String?
+  spinReward      SpinReward? @relation(fields: [spinRewardId], references: [id])
+
+  status          BoxStatus @default(BUILDING)
+  stripeSessionId String?
+  total           Int?       // final total in tetri
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sessionToken])
+  @@index([userId])
+}
+
+model SpinReward {
+  id        String     @id @default(cuid())
+  type      RewardType
+  label     String
+  value     String?    // discount % or code for discount_code type
+  boxes     GiftBox[]
+  createdAt DateTime   @default(now())
+}
+
+model SpinConfig {
+  id          String     @id @default(cuid())
+  rewardType  RewardType @unique
+  probability Float      // 0.0 - 1.0; sum should equal 1.0
+  active      Boolean    @default(true)
+  label       String
+  updatedAt   DateTime   @updatedAt
+}
+
+model ProductSyncLog {
+  id         String   @id @default(cuid())
+  source     String
+  totalSynced Int
+  errors     String[]
+  createdAt  DateTime @default(now())
+}

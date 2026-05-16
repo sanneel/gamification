@@ -1,0 +1,218 @@
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&family=Inter:wght@300;400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   MINIMALIST CANVAS — Butter + Storm
+───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --butter:     #F5E6A3;
+  --butter-2:   #EDD98A;
+  --storm:      #3A4A5C;
+  --storm-80:   rgba(58,74,92,0.80);
+  --storm-55:   rgba(58,74,92,0.55);
+  --storm-35:   rgba(58,74,92,0.35);
+  --storm-18:   rgba(58,74,92,0.18);
+  --storm-08:   rgba(58,74,92,0.08);
+  --storm-04:   rgba(58,74,92,0.04);
+
+  --font-sans:    "Inter", system-ui, sans-serif;
+  --font-display: "Cormorant Garamond", Georgia, serif;
+}
+
+/* ── Reset ─────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--butter);
+  color: var(--storm);
+  font-family: var(--font-sans);
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+* { -webkit-tap-highlight-color: transparent; }
+
+button, input, select, textarea { font: inherit; }
+
+/* ── Display type ──────────────────────────────────────────────────────────── */
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+  color: var(--storm);
+}
+
+img { display: block; }
+
+::selection { background: var(--storm); color: var(--butter); }
+
+/* ── Eyebrow text ──────────────────────────────────────────────────────────── */
+.eyebrow {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.28em;
+  color: var(--storm-55);
+  font-family: var(--font-sans);
+}
+
+/* ── Canvas (butter) surfaces ──────────────────────────────────────────────── */
+.canvas {
+  background: var(--butter);
+}
+.canvas-deep {
+  background: var(--butter-2);
+}
+.canvas-storm {
+  background: var(--storm);
+  color: var(--butter);
+}
+
+/* ── Dividers ──────────────────────────────────────────────────────────────── */
+.rule {
+  height: 1px;
+  background: var(--storm-18);
+}
+
+/* ── Typography helpers ────────────────────────────────────────────────────── */
+.text-muted   { color: var(--storm-55); }
+.text-faint   { color: var(--storm-35); }
+.text-whisper { color: var(--storm-18); }
+
+/* ── Buttons — Storm/Butter language ──────────────────────────────────────── */
+.btn-primary {
+  background: var(--storm);
+  color: var(--butter);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  transition: opacity 0.2s, transform 0.2s;
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+.btn-primary:hover  { opacity: 0.88; transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(0); opacity: 1; }
+
+.btn-outline {
+  background: transparent;
+  color: var(--storm);
+  border: 1px solid var(--storm-35);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  transition: border-color 0.2s, background 0.2s;
+  cursor: pointer;
+  outline: none;
+}
+.btn-outline:hover { border-color: var(--storm); background: var(--storm-04); }
+
+/* ── Gallery frame ─────────────────────────────────────────────────────────── */
+.gallery-frame {
+  background: var(--butter-2);
+  border: 1px solid var(--storm-18);
+}
+
+/* ── Minimal input ─────────────────────────────────────────────────────────── */
+.canvas-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--storm-35);
+  color: var(--storm);
+  outline: none;
+  border-radius: 0;
+  font-family: var(--font-sans);
+  transition: border-color 0.2s;
+}
+.canvas-input::placeholder { color: var(--storm-35); }
+.canvas-input:focus { border-bottom-color: var(--storm); }
+
+/* ── Shimmer skeleton ──────────────────────────────────────────────────────── */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--butter) 0%,
+    var(--butter-2) 50%,
+    var(--butter) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
+@keyframes shimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+/* ── Scroll ────────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--butter); }
+::-webkit-scrollbar-thumb { background: var(--storm-18); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--storm-35); }
+
+/* ── Box price badge — the ONE vivid moment in the UI ─────────────────────── */
+.box-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: var(--storm);
+  color: var(--butter);
+  border-radius: 2px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* ── Keyframes ─────────────────────────────────────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(32px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-blur {
+  from { opacity: 0; filter: blur(8px); transform: translateY(20px); }
+  to   { opacity: 1; filter: blur(0);   transform: translateY(0); }
+}
+
+/* ── Safe area ─────────────────────────────────────────────────────────────── */
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+/* ── Legacy support for LuckySpinWheel ────────────────────────────────────── */
+.btn-dopamine {
+  background: linear-gradient(135deg, #FF2D78, #7C3AED);
+  color: #fff;
+  font-weight: 700;
+  transition: opacity 0.2s;
+}
+.btn-dopamine:hover { opacity: 0.88; }
+
+.glass {
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+.glass-strong {
+  background: rgba(255,255,255,0.12);
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.16);
+}
+.glass-dark {
+  background: rgba(10,10,20,0.7);
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.08);
+}

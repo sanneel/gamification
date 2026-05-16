@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion, AnimatePresence, useScroll, useTransform, useSpring } from "framer-motion";
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Gift, ShoppingCart, Sparkles, Star, Zap } from "lucide-react";
+import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
+import { ArrowLeft, Check, ShoppingCart } from "lucide-react";
 import { type Product, formatGELSimple, savingsPct, savings } from "@/lib/types";
-import { springs, ease, fadeUp, viewport } from "@/lib/motion";
+import { springs, ease } from "@/lib/motion";
 import { useCartStore } from "@/lib/stores/cart";
 import { useUIStore } from "@/lib/stores/ui";
 
@@ -16,517 +16,252 @@ const DEMO: Record<string, Product> = {
     description: "Velvet-toned preserved roses arranged for a breathtaking opening moment. Each petal is hand-selected and treated to last for months. The perfect centrepiece for any romantic gift box.",
     normalPrice: 4900, boxPrice: 3900,
     images: [
-      "https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=800&q=80",
-      "https://images.unsplash.com/photo-1561181286-d3fee7d55364?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=1200&q=90",
+      "https://images.unsplash.com/photo-1561181286-d3fee7d55364?auto=format&fit=crop&w=1200&q=90",
     ],
-    stock: 4, active: true, category: "main_surprise", audience: "for_her", vibes: ["romantic", "luxury"], tags: ["roses", "flowers"],
+    stock: 4, active: true, category: "main_surprise", audience: "for_her", vibes: ["romantic","luxury"], tags: [],
   },
 };
 
-function FlyParticle({ trigger, origin }: { trigger: boolean; origin: { x: number; y: number } | null }) {
-  if (!trigger || !origin) return null;
-  return (
-    <motion.div
-      className="fixed z-[90] pointer-events-none rounded-full"
-      style={{ left: origin.x, top: origin.y, width: 10, height: 10, background: "#FF2D78" }}
-      initial={{ opacity: 1, scale: 1, x: 0, y: 0 }}
-      animate={{ opacity: 0, scale: 0.2, x: 50, y: -70 }}
-      transition={{ duration: 0.55, ease: ease.expo }}
-    />
-  );
-}
-
-function FloatLabel({ show }: { show: boolean }) {
-  return (
-    <AnimatePresence>
-      {show && (
-        <motion.div
-          className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
-        >
-          {["✨", "💖", "⭐", "🌟", "✨"].map((s, i) => (
-            <motion.span
-              key={i}
-              className="absolute text-sm"
-              initial={{ opacity: 1, scale: 0, x: 0, y: 0 }}
-              animate={{ opacity: 0, scale: 1.4, x: (i - 2) * 28, y: -40 - i * 5 }}
-              transition={{ duration: 0.75, delay: i * 0.05, ease: ease.expo }}
-            >
-              {s}
-            </motion.span>
-          ))}
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
-
 export default function ProductPage({ params }: { params: { id: string } }) {
-  const [product, setProduct] = useState<Product | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [product, setProduct]     = useState<Product | null>(null);
+  const [loading, setLoading]     = useState(true);
   const [activeImg, setActiveImg] = useState(0);
-  const [addedToBox, setAddedToBox] = useState(false);
-  const [addedToCart, setAddedToCart] = useState(false);
-  const [sparkleActive, setSparkleActive] = useState(false);
-  const [flyParticle, setFlyParticle] = useState(false);
-  const [flyOrigin, setFlyOrigin] = useState<{ x: number; y: number } | null>(null);
-  const addBtnRef = useRef<HTMLButtonElement>(null);
-  const heroRef = useRef<HTMLDivElement>(null);
+  const [addedBox, setAddedBox]   = useState(false);
+  const [addedCart, setAddedCart] = useState(false);
 
-  const addToCart = useCartStore((s) => s.addItem);
-  const cartItems = useCartStore((s) => s.items);
-  const cartCount = cartItems.reduce((n, i) => n + i.quantity, 0);
+  const addToCart    = useCartStore((s) => s.addItem);
+  const cartItems    = useCartStore((s) => s.items);
+  const cartCount    = cartItems.reduce((n, i) => n + i.quantity, 0);
   const openMiniCart = useUIStore((s) => s.openMiniCart);
 
+  const heroRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
-  const heroScale = useSpring(useTransform(scrollYProgress, [0, 1], [1, 1.06]), { stiffness: 120, damping: 30 });
+  const imgY = useTransform(scrollYProgress, [0, 1], [0, 60]);
 
   useEffect(() => {
     fetch(`/api/products/${params.id}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setProduct(d?.product ?? DEMO[params.id] ?? null))
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setProduct(d?.product ?? DEMO[params.id] ?? null))
       .catch(() => setProduct(DEMO[params.id] ?? null))
       .finally(() => setLoading(false));
   }, [params.id]);
 
-  function handleAddToBox(e: React.MouseEvent) {
+  function handleAddToBox() {
     if (!product) return;
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setFlyOrigin({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
-    setFlyParticle(true);
-    setTimeout(() => setFlyParticle(false), 600);
-
     const stored = JSON.parse(localStorage.getItem("box_items") ?? "[]") as Product[];
-    const next = stored.filter((p) => p.category !== product.category).concat(product).slice(0, 3);
+    const next   = stored.filter(p => p.category !== product.category).concat(product).slice(0, 3);
     localStorage.setItem("box_items", JSON.stringify(next));
-
-    setAddedToBox(true);
-    setSparkleActive(true);
-    setTimeout(() => setSparkleActive(false), 900);
-    setTimeout(() => setAddedToBox(false), 3000);
+    setAddedBox(true);
+    setTimeout(() => setAddedBox(false), 2800);
   }
 
-  function handleAddToCart(e: React.MouseEvent) {
+  function handleAddToCart() {
     if (!product) return;
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setFlyOrigin({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
-    setFlyParticle(true);
-    setTimeout(() => setFlyParticle(false), 600);
-
     addToCart(product);
-    setAddedToCart(true);
-    setTimeout(() => setAddedToCart(false), 2200);
+    setAddedCart(true);
+    setTimeout(() => setAddedCart(false), 2000);
     setTimeout(() => openMiniCart(), 300);
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0D0D0D] flex items-center justify-center">
-        <motion.div
-          className="w-12 h-12 rounded-full"
-          style={{ border: "3px solid transparent", borderTopColor: "#FF2D78", borderRightColor: "rgba(255,45,120,0.3)" }}
-          animate={{ rotate: 360 }}
-          transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }}
-        />
+      <div style={{ background: "var(--butter)", minHeight: "100dvh" }} className="flex items-center justify-center">
+        <div className="w-6 h-6 rounded-full border border-storm/20 border-t-storm animate-spin" />
       </div>
     );
   }
 
   if (!product) {
     return (
-      <div className="min-h-screen bg-[#0D0D0D] flex flex-col items-center justify-center gap-4 text-center px-6">
-        <div className="text-5xl mb-2">🔍</div>
-        <p className="text-white/50 text-lg font-bold">Product not found</p>
-        <Link href="/shop" className="text-accent font-bold hover:underline text-sm">← Back to Shop</Link>
+      <div style={{ background: "var(--butter)", minHeight: "100dvh" }} className="flex flex-col items-center justify-center gap-4">
+        <p className="font-display text-2xl text-storm">Product not found.</p>
+        <Link href="/shop" className="eyebrow underline underline-offset-4" style={{ color: "var(--storm-55)" }}>Back to shop</Link>
       </div>
     );
   }
 
-  const pct = savingsPct(product);
+  const pct   = savingsPct(product);
   const saved = savings(product);
 
   return (
-    <div className="min-h-screen bg-[#0D0D0D] overflow-x-hidden">
-      <FlyParticle trigger={flyParticle} origin={flyOrigin} />
+    <div style={{ background: "var(--butter)", minHeight: "100dvh" }}>
 
       {/* Nav */}
-      <nav className="sticky top-0 z-50 glass-strong border-b border-white/5 px-5 py-4 flex items-center gap-3">
-        <Link href="/shop" className="flex items-center gap-2 text-white/40 hover:text-white transition-colors text-sm shrink-0">
-          <ArrowLeft className="w-4 h-4" />
-          <span className="hidden sm:inline">Shop</span>
+      <nav className="sticky top-0 z-50 px-8 sm:px-12 h-16 flex items-center gap-4"
+        style={{ background: "rgba(245,230,163,0.95)", backdropFilter: "blur(16px)", borderBottom: "1px solid var(--storm-12)" }}>
+        <Link href="/shop" className="flex items-center gap-2 text-sm transition-opacity hover:opacity-60"
+          style={{ color: "var(--storm-55)" }}>
+          <ArrowLeft className="w-4 h-4" /> Shop
         </Link>
-        <span className="text-white/12">/</span>
-        <span className="text-white/50 text-sm truncate flex-1 min-w-0">{product.title}</span>
-        <div className="flex items-center gap-2 shrink-0">
-          <motion.button
-            onClick={openMiniCart}
-            whileHover={{ scale: 1.06 }}
-            whileTap={{ scale: 0.94 }}
-            className="relative w-9 h-9 glass border border-white/10 rounded-xl flex items-center justify-center text-white/50 hover:text-white transition-colors"
-            aria-label="Open cart"
-          >
-            <ShoppingCart className="w-4 h-4" />
-            <AnimatePresence>
-              {cartCount > 0 && (
-                <motion.span
-                  key={cartCount}
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  exit={{ scale: 0 }}
-                  className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-accent text-white text-[9px] font-black rounded-full flex items-center justify-center"
-                >
-                  {cartCount}
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </motion.button>
-          <Link href="/" className="font-display text-xl font-bold text-white hidden sm:block">
-            gamif<span className="text-accent">.</span>
-          </Link>
-        </div>
+        <span className="text-sm truncate flex-1 text-center" style={{ color: "var(--storm-35)" }}>{product.title}</span>
+        <button onClick={openMiniCart} className="relative" aria-label="Cart" style={{ color: "var(--storm-55)" }}>
+          <ShoppingCart className="w-4 h-4" />
+          <AnimatePresence>
+            {cartCount > 0 && (
+              <motion.span key={cartCount} initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
+                transition={springs.bouncy}
+                className="absolute -top-1.5 -right-1.5 w-4 h-4 text-[8px] font-bold rounded-full flex items-center justify-center"
+                style={{ background: "var(--storm)", color: "var(--butter)" }}>
+                {cartCount}
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </button>
       </nav>
 
-      {/* Mobile hero */}
-      <div className="lg:hidden">
-        <div ref={heroRef} className="relative w-full aspect-[4/3] overflow-hidden">
-          <motion.div className="absolute inset-0" style={{ scale: heroScale }}>
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeImg}
-                className="absolute inset-0"
-                initial={{ opacity: 0, scale: 1.08 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.5, ease: ease.expo }}
-              >
-                <Image src={product.images[activeImg] ?? product.images[0]} alt={product.title} fill className="object-cover" priority sizes="100vw" />
-              </motion.div>
-            </AnimatePresence>
-          </motion.div>
-          <div className="absolute bottom-0 inset-x-0 h-1/2 bg-gradient-to-t from-[#0D0D0D] via-[#0D0D0D]/30 to-transparent pointer-events-none" />
-          {pct >= 5 && (
-            <motion.div
-              className="absolute top-4 left-4 text-white text-xs font-black px-3 py-1.5 rounded-full"
-              style={{ background: "linear-gradient(135deg, #FF2D78, #7C3AED)" }}
-              initial={{ scale: 0, rotate: -10 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ ...springs.bouncy, delay: 0.3 }}
-            >
-              -{pct}% in Box
+      {/* Hero — full-bleed image with text below */}
+      <div ref={heroRef} className="relative overflow-hidden" style={{ height: "70vh" }}>
+        <motion.div className="absolute inset-0" style={{ y: imgY }}>
+          <AnimatePresence mode="wait">
+            <motion.div key={activeImg} className="absolute inset-0"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.6 }}>
+              <Image src={product.images[activeImg] ?? product.images[0]} alt={product.title}
+                fill className="object-cover" priority sizes="100vw" />
             </motion.div>
-          )}
-          {product.images.length > 1 && (
-            <div className="absolute bottom-5 left-0 right-0 flex justify-center gap-1.5 z-10">
-              {product.images.map((_, i) => (
-                <button key={i} onClick={() => setActiveImg(i)} aria-label={`Image ${i + 1}`}
-                  className={`rounded-full transition-all ${i === activeImg ? "w-5 h-2 bg-white" : "w-2 h-2 bg-white/30"}`}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+          </AnimatePresence>
+        </motion.div>
+
+        {/* Image dots */}
+        {product.images.length > 1 && (
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+            {product.images.map((_, i) => (
+              <button key={i} onClick={() => setActiveImg(i)} aria-label={`Image ${i+1}`}
+                className="w-8 h-px transition-all"
+                style={{ background: i === activeImg ? "rgba(245,230,163,0.9)" : "rgba(245,230,163,0.35)" }} />
+            ))}
+          </div>
+        )}
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 py-8 lg:py-16">
-        <div className="grid lg:grid-cols-2 gap-10 lg:gap-20 items-start">
+      {/* Content */}
+      <div className="max-w-6xl mx-auto px-8 sm:px-12 py-16 grid lg:grid-cols-2 gap-16 lg:gap-24">
 
-          {/* Desktop image gallery */}
-          <div className="hidden lg:block space-y-4">
-            <div className="group relative">
-              <motion.div
-                className="relative aspect-square rounded-3xl overflow-hidden bg-card cursor-zoom-in"
-                whileHover={{ scale: 1.01 }}
-                transition={springs.gentle}
-              >
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={activeImg}
-                    className="absolute inset-0"
-                    initial={{ opacity: 0, scale: 1.06 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.45, ease: ease.expo }}
-                  >
-                    <Image src={product.images[activeImg] ?? product.images[0]} alt={product.title} fill className="object-cover" priority sizes="600px" />
-                  </motion.div>
-                </AnimatePresence>
+        {/* Left — product info */}
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: ease.expo }}>
 
-                {pct >= 5 && (
-                  <motion.div
-                    className="absolute top-5 left-5 text-white text-xs font-black px-4 py-2 rounded-full z-10"
-                    style={{ background: "linear-gradient(135deg, #FF2D78, #7C3AED)" }}
-                    initial={{ scale: 0, rotate: -12 }}
-                    animate={{ scale: 1, rotate: 0 }}
-                    transition={{ ...springs.bouncy, delay: 0.4 }}
-                  >
-                    -{pct}% in Box
-                  </motion.div>
-                )}
+          <p className="eyebrow mb-4">{product.vibes.join(" · ")}</p>
+          <h1 className="font-display font-light text-storm leading-tight mb-6"
+            style={{ fontSize: "clamp(2.2rem, 5vw, 4.5rem)" }}>
+            {product.title}
+          </h1>
+          <p className="leading-relaxed mb-10" style={{ color: "var(--storm-55)", fontSize: "1rem", maxWidth: "42ch" }}>
+            {product.description}
+          </p>
 
-                {product.images.length > 1 && (
-                  <>
-                    <motion.button
-                      onClick={() => setActiveImg((i) => (i - 1 + product.images.length) % product.images.length)}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 glass rounded-full border border-white/10 flex items-center justify-center hover:bg-white/20 transition-all opacity-0 group-hover:opacity-100"
-                      whileTap={{ scale: 0.9 }}
-                    >
-                      <ChevronLeft className="w-5 h-5 text-white" />
-                    </motion.button>
-                    <motion.button
-                      onClick={() => setActiveImg((i) => (i + 1) % product.images.length)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 glass rounded-full border border-white/10 flex items-center justify-center hover:bg-white/20 transition-all opacity-0 group-hover:opacity-100"
-                      whileTap={{ scale: 0.9 }}
-                    >
-                      <ChevronRight className="w-5 h-5 text-white" />
-                    </motion.button>
-                  </>
-                )}
-              </motion.div>
-            </div>
-
-            {product.images.length > 1 && (
-              <div className="flex gap-3">
-                {product.images.map((img, i) => (
-                  <motion.button
-                    key={i}
-                    onClick={() => setActiveImg(i)}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className={`relative w-20 h-20 rounded-2xl overflow-hidden border-2 transition-all ${
-                      i === activeImg ? "border-accent shadow-[0_0_16px_rgba(255,45,120,0.4)]" : "border-white/10 opacity-50 hover:opacity-80"
-                    }`}
-                  >
-                    <Image src={img} alt="" fill className="object-cover" sizes="80px" />
-                  </motion.button>
-                ))}
-              </div>
+          {/* Audience */}
+          <div className="flex items-center gap-4 mb-12">
+            <span className="eyebrow">Perfect for</span>
+            <span className="eyebrow" style={{ color: "var(--storm)" }}>
+              {product.audience === "for_her" ? "Her"
+                : product.audience === "for_him" ? "Him"
+                : product.audience === "couple" ? "Couples"
+                : "Anyone"}
+            </span>
+            {product.stock > 0 && product.stock <= 5 && (
+              <>
+                <div className="w-px h-3" style={{ background: "var(--storm-18)" }} />
+                <span className="eyebrow" style={{ color: "var(--storm)" }}>Only {product.stock} left</span>
+              </>
             )}
-
-            {/* Ambient glow */}
-            <div className="relative h-4 pointer-events-none">
-              <div className="absolute inset-x-12 h-16 -top-4 bg-accent/8 blur-3xl rounded-full" />
-            </div>
           </div>
 
-          {/* Info column */}
-          <motion.div
-            className="space-y-6"
-            initial="hidden"
-            animate="visible"
-            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
-          >
-            {/* Vibe tags */}
-            <motion.div className="flex gap-2 flex-wrap" variants={fadeUp}>
-              {product.vibes.slice(0, 3).map((v) => (
-                <span key={v} className="text-[10px] font-black uppercase tracking-wider text-violet-2 bg-violet/10 px-3 py-1 rounded-full border border-violet/20">
-                  {v}
-                </span>
+          {/* Thumbnails */}
+          {product.images.length > 1 && (
+            <div className="flex gap-3 mb-12">
+              {product.images.map((img, i) => (
+                <button key={i} onClick={() => setActiveImg(i)}
+                  className="relative w-16 h-20 overflow-hidden transition-opacity"
+                  style={{ opacity: i === activeImg ? 1 : 0.45, outline: i === activeImg ? "1.5px solid var(--storm)" : "none" }}>
+                  <Image src={img} alt="" fill className="object-cover" sizes="64px" />
+                </button>
               ))}
-            </motion.div>
+            </div>
+          )}
+        </motion.div>
 
-            {/* Title */}
-            <motion.h1
-              className="font-display text-4xl lg:text-5xl font-bold text-white leading-tight"
-              variants={fadeUp}
-            >
-              {product.title}
-            </motion.h1>
+        {/* Right — pricing + actions */}
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: ease.expo, delay: 0.1 }}
+          className="lg:pt-12">
 
-            {/* Social proof */}
-            <motion.div className="flex items-center gap-3 flex-wrap" variants={fadeUp}>
-              <div className="flex">
-                {[1,2,3,4,5].map((s) => <Star key={s} className="w-4 h-4 fill-gold text-gold" />)}
+          {/* Box price section */}
+          <div className="p-8 mb-6" style={{ background: "var(--butter-2)", border: "1px solid var(--storm-18)" }}>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <p className="eyebrow mb-2">Box price</p>
+                <p className="font-display text-4xl font-semibold text-storm">{formatGELSimple(product.boxPrice)}</p>
               </div>
-              <span className="text-white/40 text-sm">4.9 · 847 gifted</span>
-              <span className="text-emerald text-sm font-bold">❤️ Top pick this week</span>
-            </motion.div>
-
-            {/* Description */}
-            <motion.p className="text-white/60 text-base leading-relaxed" variants={fadeUp}>
-              {product.description}
-            </motion.p>
-
-            {/* Audience */}
-            <motion.div className="flex items-center gap-2" variants={fadeUp}>
-              <span className="text-white/25 text-xs font-bold uppercase tracking-widest">Perfect for</span>
-              <span className="glass border border-white/10 text-white/65 text-xs font-bold px-3 py-1.5 rounded-full">
-                {product.audience === "for_her" ? "💗 Her"
-                  : product.audience === "for_him" ? "💙 Him"
-                  : product.audience === "couple" ? "💑 Couples"
-                  : "🎁 Anyone"}
-              </span>
-              {product.stock > 0 && product.stock <= 5 && (
-                <span className="text-gold text-xs font-bold flex items-center gap-1">
-                  <motion.span
-                    className="inline-block w-1.5 h-1.5 rounded-full bg-gold"
-                    animate={{ opacity: [1, 0.3, 1] }}
-                    transition={{ duration: 1, repeat: Infinity }}
-                  />
-                  Only {product.stock} left!
-                </span>
+              {pct >= 5 && (
+                <div className="text-right">
+                  <p className="eyebrow mb-1">You save</p>
+                  <p className="font-display text-2xl text-storm">{formatGELSimple(saved)}</p>
+                  <p className="eyebrow mt-1">{pct}% off retail</p>
+                </div>
               )}
-            </motion.div>
+            </div>
+            <motion.button onClick={handleAddToBox}
+              whileHover={{ opacity: 0.85 }} whileTap={{ scale: 0.97 }}
+              className="btn-primary w-full py-4 text-xs tracking-widest">
+              {addedBox ? "✓ Added to Box" : "Add to Box"}
+            </motion.button>
+          </div>
 
-            {/* Dual pricing block */}
-            <motion.div
-              className="rounded-3xl overflow-hidden"
-              variants={fadeUp}
-              style={{ border: "1px solid rgba(255,45,120,0.15)" }}
-            >
-              {/* Normal price row */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-white/5"
-                style={{ background: "rgba(255,255,255,0.02)" }}>
-                <div>
-                  <p className="text-white/25 text-[9px] font-black uppercase tracking-[0.2em] mb-1">Normal Price</p>
-                  <p className="text-xl font-bold text-white/35 line-through">{formatGELSimple(product.normalPrice)}</p>
-                </div>
-                <motion.button
-                  onClick={handleAddToCart}
-                  whileHover={{ scale: 1.04 }}
-                  whileTap={{ scale: 0.95 }}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                    addedToCart
-                      ? "bg-emerald/15 border border-emerald/40 text-emerald"
-                      : "border border-white/12 text-white/45 hover:text-white hover:border-white/30"
-                  }`}
-                >
-                  {addedToCart ? (
-                    <><Check className="w-3.5 h-3.5" /> Added!</>
-                  ) : (
-                    <><ShoppingCart className="w-3.5 h-3.5" /> Buy Normally</>
-                  )}
-                </motion.button>
-              </div>
+          {/* Normal price */}
+          <div className="p-6 flex items-center justify-between mb-6"
+            style={{ border: "1px solid var(--storm-12)" }}>
+            <div>
+              <p className="eyebrow mb-1">Normal price</p>
+              <p className="font-display text-2xl text-storm" style={{ opacity: 0.45, textDecoration: "line-through" }}>
+                {formatGELSimple(product.normalPrice)}
+              </p>
+            </div>
+            <motion.button onClick={handleAddToCart}
+              whileHover={{ opacity: 0.7 }} whileTap={{ scale: 0.97 }}
+              className="btn-outline px-6 py-3 text-xs tracking-widest">
+              {addedCart ? <><Check className="inline w-3 h-3 mr-1" /> Added</> : "Buy Normally"}
+            </motion.button>
+          </div>
 
-              {/* Box price row */}
-              <div className="relative px-5 py-5"
-                style={{ background: "linear-gradient(135deg, rgba(255,45,120,0.07) 0%, rgba(124,58,237,0.07) 100%)" }}>
-                {/* Shimmer sweep */}
-                <motion.div
-                  className="absolute inset-0 pointer-events-none"
-                  style={{ background: "linear-gradient(90deg, transparent, rgba(255,45,120,0.06), transparent)" }}
-                  animate={{ x: ["-100%", "200%"] }}
-                  transition={{ duration: 3.5, repeat: Infinity, repeatDelay: 2.5 }}
-                />
-                <div className="relative flex items-end justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <span className="box-price-badge flex items-center gap-1 w-fit mb-2.5">
-                      <Sparkles className="w-2.5 h-2.5" />
-                      Box Price
-                    </span>
-                    <p className="text-5xl font-black text-white leading-none">
-                      {formatGELSimple(product.boxPrice)}
-                    </p>
-                    <p className="text-accent text-sm font-bold mt-1.5">
-                      Save {formatGELSimple(saved)} ({pct}%) ✨
-                    </p>
-                  </div>
-                  <div className="relative shrink-0">
-                    <FloatLabel show={sparkleActive} />
-                    <motion.button
-                      ref={addBtnRef}
-                      onClick={handleAddToBox}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.93 }}
-                      className={`flex items-center gap-2 px-5 py-3.5 rounded-2xl text-sm font-black uppercase tracking-wider transition-all ${
-                        addedToBox
-                          ? "bg-emerald/15 border border-emerald/40 text-emerald shadow-[0_0_20px_rgba(16,185,129,0.25)]"
-                          : "btn-dopamine"
-                      }`}
-                    >
-                      <AnimatePresence mode="wait">
-                        {addedToBox ? (
-                          <motion.span key="added" className="flex items-center gap-2"
-                            initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={springs.bouncy}>
-                            <Check className="w-4 h-4" /> Added!
-                          </motion.span>
-                        ) : (
-                          <motion.span key="add" className="flex items-center gap-2"
-                            initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-                            <Gift className="w-4 h-4" /> Add to Box
-                          </motion.span>
-                        )}
-                      </AnimatePresence>
-                    </motion.button>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Box CTA link */}
-            <motion.div variants={fadeUp}>
-              <Link
-                href="/build-a-box"
-                className="flex items-center justify-between w-full py-3.5 px-5 glass border border-white/8 rounded-2xl text-sm font-bold text-white/50 hover:text-white hover:border-white/20 transition-all"
-              >
-                <div className="flex items-center gap-2">
-                  <Gift className="w-4 h-4" />
-                  Open the Gift Box Builder
-                </div>
-                <span className="text-white/25">→</span>
-              </Link>
-            </motion.div>
-
-            {/* Trust badges */}
-            <motion.div className="grid grid-cols-3 gap-3" variants={fadeUp}>
-              {[
-                { icon: "🔒", label: "Secure Checkout" },
-                { icon: "🚚", label: "Fast Delivery" },
-                { icon: "🎀", label: "Gift Wrapped" },
-              ].map((b) => (
-                <motion.div
-                  key={b.label}
-                  className="glass border border-white/5 rounded-2xl py-4 flex flex-col items-center gap-1.5"
-                  whileHover={{ scale: 1.04, borderColor: "rgba(255,255,255,0.12)" }}
-                  transition={springs.snappy}
-                >
-                  <span className="text-2xl">{b.icon}</span>
-                  <span className="text-white/35 text-[10px] font-bold uppercase tracking-wider text-center leading-tight">{b.label}</span>
-                </motion.div>
-              ))}
-            </motion.div>
-          </motion.div>
-        </div>
-
-        {/* Complete the vibe */}
-        <motion.div
-          className="mt-20 pt-12 border-t border-white/5"
-          initial="hidden"
-          whileInView="visible"
-          viewport={viewport}
-          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
-        >
-          <motion.h2 className="font-display text-2xl font-bold text-white mb-8" variants={fadeUp}>
-            Complete the vibe
-          </motion.h2>
-          <motion.div
-            className="grid grid-cols-2 md:grid-cols-4 gap-4"
-            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.05 } } }}
-          >
+          {/* Trust */}
+          <div className="grid grid-cols-3 gap-4">
             {[
-              { slot: "Sweet Pick", emoji: "🍬" },
-              { slot: "Tiny Extra", emoji: "✨" },
-              { slot: "Main Surprise", emoji: "🎁" },
-              { slot: "Lucky Bonus", emoji: "🌟" },
-            ].map(({ slot, emoji }) => (
-              <motion.div
-                key={slot}
-                variants={fadeUp}
-                className="glass border border-white/5 rounded-2xl p-5 flex flex-col items-center gap-2 text-center"
-                whileHover={{ scale: 1.04, borderColor: "rgba(255,45,120,0.18)" }}
-                transition={springs.snappy}
-              >
-                <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-2xl">{emoji}</div>
-                <p className="text-white/50 text-xs font-bold uppercase tracking-wider">{slot}</p>
-                <Link href="/shop" className="text-accent text-xs font-bold hover:underline">Browse →</Link>
-              </motion.div>
+              { label: "Gift-wrapped" },
+              { label: "Fast delivery" },
+              { label: "Secure checkout" },
+            ].map(b => (
+              <div key={b.label} className="text-center py-4"
+                style={{ border: "1px solid var(--storm-12)" }}>
+                <p className="eyebrow">{b.label}</p>
+              </div>
             ))}
-          </motion.div>
+          </div>
+
+          {/* Box builder CTA */}
+          <div className="mt-6 pt-6" style={{ borderTop: "1px solid var(--storm-12)" }}>
+            <p className="text-sm mb-3" style={{ color: "var(--storm-55)" }}>
+              Box prices are 15–25% cheaper than retail. Bundle this with two more items and spin for a reward.
+            </p>
+            <Link href="/build-a-box" className="eyebrow underline underline-offset-4 hover:opacity-75 transition-opacity"
+              style={{ color: "var(--storm)" }}>
+              Open the gift box builder →
+            </Link>
+          </div>
         </motion.div>
       </div>
+
+      {/* Editorial story section */}
+      <section className="px-8 sm:px-12 py-20" style={{ background: "var(--butter-2)", borderTop: "1px solid var(--storm-12)" }}>
+        <div className="max-w-4xl mx-auto">
+          <p className="eyebrow mb-8">Why this item</p>
+          <p className="font-display font-light text-storm leading-relaxed"
+            style={{ fontSize: "clamp(1.4rem, 3vw, 2.5rem)" }}>
+            &ldquo;The best gifts aren&apos;t the most expensive — they&apos;re the ones that make the person feel truly seen.&rdquo;
+          </p>
+        </div>
+      </section>
     </div>
   );
 }

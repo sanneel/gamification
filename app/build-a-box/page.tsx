@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check, Gift, MessageSquare, ShoppingCart, Sparkles, X, Zap } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ShoppingCart } from "lucide-react";
 import LuckySpinWheel from "@/components/LuckySpinWheel";
 import { type Product, type ProductCategory, type SpinReward, BOX_SLOTS, formatGELSimple } from "@/lib/types";
 import { springs, ease } from "@/lib/motion";
@@ -15,474 +15,359 @@ import { useUIStore } from "@/lib/stores/ui";
 
 const DEMO: Record<ProductCategory, Product[]> = {
   main_surprise: [
-    { id: "p1", title: "Preserved Rose Box",   description: "Velvet-toned roses for a breathtaking reveal.",               normalPrice: 4900, boxPrice: 3900, images: ["https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=800&q=80","https://images.unsplash.com/photo-1561181286-d3fee7d55364?auto=format&fit=crop&w=800&q=80"], stock: 12, active: true, category: "main_surprise", audience: "for_her", vibes: ["romantic","luxury"], tags: [] },
-    { id: "p2", title: "Gold Initial Necklace", description: "A personal keepsake chosen just for them.",                   normalPrice: 5900, boxPrice: 4800, images: ["https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=800&q=80"], stock:  8, active: true, category: "main_surprise", audience: "for_her", vibes: ["luxury","aesthetic"], tags: [] },
-    { id: "p3", title: "Crystal Perfume",       description: "A luxury fragrance in a hand-crafted bottle.",                normalPrice: 6500, boxPrice: 5200, images: ["https://images.unsplash.com/photo-1541643600914-78b084683702?auto=format&fit=crop&w=800&q=80"], stock:  6, active: true, category: "main_surprise", audience: "for_her", vibes: ["luxury"],           tags: [] },
+    { id: "p1",  title: "Preserved Rose Box",    description: "Velvet-toned roses for a breathtaking reveal.",      normalPrice: 4900, boxPrice: 3900, images: ["https://images.unsplash.com/photo-1518895949257-7621c3c786d7?auto=format&fit=crop&w=900&q=85"], stock: 12, active: true, category: "main_surprise", audience: "for_her", vibes: ["romantic","luxury"],    tags: [] },
+    { id: "p2",  title: "Gold Initial Necklace",  description: "A personal keepsake chosen just for them.",          normalPrice: 5900, boxPrice: 4800, images: ["https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=900&q=85"], stock:  8, active: true, category: "main_surprise", audience: "for_her", vibes: ["luxury","aesthetic"], tags: [] },
+    { id: "p3",  title: "Crystal Perfume",        description: "A luxury fragrance in a hand-crafted bottle.",       normalPrice: 6500, boxPrice: 5200, images: ["https://images.unsplash.com/photo-1541643600914-78b084683702?auto=format&fit=crop&w=900&q=85"], stock:  6, active: true, category: "main_surprise", audience: "for_her", vibes: ["luxury"],           tags: [] },
   ],
   sweet_pick: [
-    { id: "p4", title: "Signature Soy Candle",  description: "Warm amber — an evening-in feeling.",                         normalPrice: 2800, boxPrice: 2200, images: ["https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=800&q=80"], stock: 25, active: true, category: "sweet_pick",    audience: "neutral",  vibes: ["cozy","romantic"],  tags: [] },
-    { id: "p5", title: "Rose Quartz Roller",    description: "Cooling, soothing and visually stunning.",                    normalPrice: 3100, boxPrice: 2500, images: ["https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?auto=format&fit=crop&w=800&q=80"], stock: 18, active: true, category: "sweet_pick",    audience: "for_her",  vibes: ["cozy","soft"],      tags: [] },
-    { id: "p6", title: "Cashmere Eye Mask",     description: "The luxury sleep essential they always wanted.",               normalPrice: 2600, boxPrice: 2100, images: ["https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=800&q=80"], stock: 14, active: true, category: "sweet_pick",    audience: "for_her",  vibes: ["cozy","luxury"],    tags: [] },
+    { id: "p4",  title: "Signature Soy Candle",   description: "Warm amber — an evening-in feeling.",               normalPrice: 2800, boxPrice: 2200, images: ["https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=900&q=85"], stock: 25, active: true, category: "sweet_pick",    audience: "neutral",  vibes: ["cozy","romantic"],  tags: [] },
+    { id: "p5",  title: "Rose Quartz Roller",     description: "Cooling, soothing and visually stunning.",           normalPrice: 3100, boxPrice: 2500, images: ["https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?auto=format&fit=crop&w=900&q=85"], stock: 18, active: true, category: "sweet_pick",    audience: "for_her",  vibes: ["cozy","soft"],      tags: [] },
+    { id: "p6",  title: "Cashmere Eye Mask",      description: "The luxury sleep essential they always wanted.",     normalPrice: 2600, boxPrice: 2100, images: ["https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=900&q=85"], stock: 14, active: true, category: "sweet_pick",    audience: "for_her",  vibes: ["cozy","luxury"],    tags: [] },
   ],
   tiny_extra: [
-    { id: "p7", title: "Artisan Chocolate Box", description: "Hand-crafted truffles tucked inside tissue paper.",           normalPrice: 1800, boxPrice: 1400, images: ["https://images.unsplash.com/photo-1549007994-cb92caebd54b?auto=format&fit=crop&w=800&q=80"], stock: 30, active: true, category: "tiny_extra",    audience: "neutral",  vibes: ["cute","cozy"],      tags: [] },
-    { id: "p8", title: "Plush Teddy Bear",      description: "Soft, huggable and impossibly cute.",                         normalPrice: 2200, boxPrice: 1800, images: ["https://images.unsplash.com/photo-1563901935883-cb61f5d49be4?auto=format&fit=crop&w=800&q=80"], stock: 20, active: true, category: "tiny_extra",    audience: "for_her",  vibes: ["cute","soft"],      tags: [] },
-    { id: "p11", title: "Gold Foil Card",       description: "A luxurious finishing touch to complete the story.",          normalPrice:  600, boxPrice:  400, images: ["https://images.unsplash.com/photo-1512909006721-3d6018887383?auto=format&fit=crop&w=800&q=80"], stock: 50, active: true, category: "tiny_extra",    audience: "neutral",  vibes: ["romantic"],         tags: [] },
+    { id: "p7",  title: "Artisan Chocolate Box",  description: "Hand-crafted truffles inside tissue paper.",         normalPrice: 1800, boxPrice: 1400, images: ["https://images.unsplash.com/photo-1549007994-cb92caebd54b?auto=format&fit=crop&w=900&q=85"], stock: 30, active: true, category: "tiny_extra",    audience: "neutral",  vibes: ["cute","cozy"],      tags: [] },
+    { id: "p8",  title: "Plush Teddy Bear",       description: "Soft, huggable and impossibly cute.",                normalPrice: 2200, boxPrice: 1800, images: ["https://images.unsplash.com/photo-1563901935883-cb61f5d49be4?auto=format&fit=crop&w=900&q=85"], stock: 20, active: true, category: "tiny_extra",    audience: "for_her",  vibes: ["cute","soft"],      tags: [] },
+    { id: "p11", title: "Gold Foil Card",         description: "A luxurious finishing touch.",                       normalPrice:  600, boxPrice:  400, images: ["https://images.unsplash.com/photo-1512909006721-3d6018887383?auto=format&fit=crop&w=900&q=85"], stock: 50, active: true, category: "tiny_extra",    audience: "neutral",  vibes: ["romantic"],         tags: [] },
   ],
   lucky_bonus: [],
 };
 
-type Step = "main_surprise" | "sweet_pick" | "tiny_extra" | "message" | "spin" | "review";
-const STEPS: Step[] = ["main_surprise", "sweet_pick", "tiny_extra", "message", "spin", "review"];
+// ── Steps: spin is NOW between main_surprise and sweet_pick ──────────────────
 
-const STEP_CONFIG: Record<Step, { label: string; eyebrow: string; title: string; subtitle: string; accent: string; bg: string }> = {
+type Step = "main_surprise" | "spin" | "sweet_pick" | "tiny_extra" | "message" | "review";
+const STEPS: Step[] = ["main_surprise", "spin", "sweet_pick", "tiny_extra", "message", "review"];
+
+const STEP_LABEL: Record<Step, string> = {
+  main_surprise: "The Centrepiece",
+  spin:          "Your Reward",
+  sweet_pick:    "Something Sweet",
+  tiny_extra:    "The Finishing Touch",
+  message:       "Your Message",
+  review:        "Review",
+};
+
+const STEP_COPY: Record<Step, { eyebrow: string; title: string; sub: string }> = {
   main_surprise: {
-    label: "Main Surprise", eyebrow: "Step 1 of 3",
-    title: "The centerpiece.",
-    subtitle: "Choose the hero item that will make their breath catch.",
-    accent: "#FF2D78",
-    bg: "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,45,120,0.12) 0%, transparent 70%)",
-  },
-  sweet_pick: {
-    label: "Sweet Pick", eyebrow: "Step 2 of 3",
-    title: "Something sweet.",
-    subtitle: "Add warmth. The piece that softens everything.",
-    accent: "#7C3AED",
-    bg: "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(124,58,237,0.12) 0%, transparent 70%)",
-  },
-  tiny_extra: {
-    label: "Tiny Extra", eyebrow: "Step 3 of 3",
-    title: "The finishing whisper.",
-    subtitle: "It's the tiny things that make someone feel truly seen.",
-    accent: "#F5A623",
-    bg: "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(245,166,35,0.12) 0%, transparent 70%)",
-  },
-  message: {
-    label: "Gift Message", eyebrow: "Almost done",
-    title: "Write from the heart.",
-    subtitle: "They'll find this inside the box. Make it count.",
-    accent: "#FF2D78",
-    bg: "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,45,120,0.08) 0%, transparent 70%)",
+    eyebrow: "Step one",
+    title:   "The centrepiece.",
+    sub:     "Choose the hero item that will make their breath catch.",
   },
   spin: {
-    label: "Lucky Spin", eyebrow: "Your reward",
-    title: "Spin the wheel.",
-    subtitle: "Every order wins. Spin for your exclusive reward.",
-    accent: "#FFD700",
-    bg: "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,215,0,0.12) 0%, transparent 70%)",
+    eyebrow: "Bonus reward",
+    title:   "Spin for a reward.",
+    sub:     "You chose your hero gift. Now spin — every order wins something.",
+  },
+  sweet_pick: {
+    eyebrow: "Step two",
+    title:   "Something sweet.",
+    sub:     "Add a piece that softens the moment.",
+  },
+  tiny_extra: {
+    eyebrow: "Step three",
+    title:   "The finishing whisper.",
+    sub:     "It's the little things that make them feel truly seen.",
+  },
+  message: {
+    eyebrow: "Almost done",
+    title:   "Write from the heart.",
+    sub:     "This goes inside the box. They'll find it first.",
   },
   review: {
-    label: "Review", eyebrow: "Final step",
-    title: "Your gift is ready.",
-    subtitle: "Everything's in place. Review and checkout.",
-    accent: "#10B981",
-    bg: "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(16,185,129,0.10) 0%, transparent 70%)",
+    eyebrow: "Final step",
+    title:   "Your gift is ready.",
+    sub:     "Everything is in place. Review, then checkout.",
   },
 };
 
-// ─── Left Panel — Gift Composition Preview ────────────────────────────────────
+// ─── Product card (gallery style) ─────────────────────────────────────────────
 
-function GiftPreviewPanel({
-  selections, giftMessage, recipientName, spinReward, subtotal, currentStep,
-}: {
-  selections: Partial<Record<ProductCategory, Product>>;
-  giftMessage: string;
-  recipientName: string;
-  spinReward: SpinReward | null;
-  subtotal: number;
-  currentStep: Step;
+function GalleryCard({ product, selected, onSelect }: {
+  product: Product; selected: boolean; onSelect: () => void;
 }) {
-  const config = STEP_CONFIG[currentStep];
-  const slots = [
-    { key: "main_surprise" as ProductCategory, label: "Main Surprise", emoji: "🎁" },
-    { key: "sweet_pick" as ProductCategory,    label: "Sweet Pick",    emoji: "🍬" },
-    { key: "tiny_extra" as ProductCategory,    label: "Tiny Extra",    emoji: "✨" },
-  ];
-
-  return (
-    <div className="relative h-full flex flex-col justify-between p-8 overflow-hidden">
-      {/* Dynamic background glow */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={currentStep}
-          className="absolute inset-0 pointer-events-none"
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          transition={{ duration: 0.8 }}
-          style={{ background: config.bg }}
-        />
-      </AnimatePresence>
-
-      {/* Header */}
-      <div className="relative z-10">
-        <Link href="/" className="font-display text-xl font-bold text-white block mb-10">
-          gamif<span style={{ color: config.accent }}>.</span>
-        </Link>
-
-        <AnimatePresence mode="wait">
-          <motion.div key={currentStep + "-info"}
-            initial={{ opacity: 0, y: 12, filter: "blur(6px)" }}
-            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.45, ease: ease.expo }}>
-            <p className="text-[10px] font-black uppercase tracking-[0.25em] mb-2" style={{ color: config.accent }}>
-              {config.eyebrow}
-            </p>
-            <h2 className="font-display text-4xl font-bold text-white leading-tight mb-1">{config.title}</h2>
-          </motion.div>
-        </AnimatePresence>
-      </div>
-
-      {/* Slot composition */}
-      <div className="relative z-10 flex-1 flex flex-col justify-center gap-3 my-6">
-        {slots.map((slot, i) => {
-          const product = selections[slot.key];
-          const isActive = currentStep === slot.key;
-          return (
-            <motion.div
-              key={slot.key}
-              className="relative flex items-center gap-4 rounded-2xl p-3 transition-all"
-              style={{
-                background: product ? "rgba(255,255,255,0.05)" : isActive ? `${config.accent}12` : "rgba(255,255,255,0.02)",
-                border: product ? "1px solid rgba(255,255,255,0.1)" : isActive ? `1px solid ${config.accent}40` : "1px solid rgba(255,255,255,0.05)",
-                boxShadow: product ? "0 8px 24px rgba(0,0,0,0.3)" : isActive ? `0 0 24px ${config.accent}20` : "none",
-              }}
-              animate={isActive && !product ? {
-                boxShadow: [`0 0 16px ${config.accent}10`, `0 0 28px ${config.accent}25`, `0 0 16px ${config.accent}10`],
-              } : {}}
-              transition={{ duration: 2, repeat: Infinity }}>
-
-              <AnimatePresence mode="wait">
-                {product ? (
-                  <motion.div key="filled" className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0"
-                    initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                    transition={springs.bouncy}>
-                    <Image src={product.images[0]} alt={product.title} fill className="object-cover" sizes="56px" />
-                    <div className="absolute inset-0 flex items-center justify-center"
-                      style={{ background: "rgba(16,185,129,0.3)" }}>
-                      <Check className="w-4 h-4 text-white" />
-                    </div>
-                  </motion.div>
-                ) : (
-                  <motion.div key="empty"
-                    className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0 text-xl"
-                    style={{ background: isActive ? `${config.accent}15` : "rgba(255,255,255,0.03)", border: `1px solid ${isActive ? config.accent + "30" : "rgba(255,255,255,0.06)"}` }}
-                    animate={isActive ? { scale: [1, 1.05, 1] } : {}}
-                    transition={{ duration: 2, repeat: Infinity }}>
-                    {slot.emoji}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <div className="flex-1 min-w-0">
-                <p className="text-white/30 text-[9px] font-black uppercase tracking-[0.18em]">{slot.label}</p>
-                {product ? (
-                  <motion.p initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-                    className="text-white font-bold text-sm truncate">{product.title}</motion.p>
-                ) : (
-                  <p className="text-white/20 text-xs">{isActive ? "Selecting..." : "Not chosen yet"}</p>
-                )}
-              </div>
-
-              {product && (
-                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                  className="text-white font-black text-sm shrink-0">
-                  {formatGELSimple(product.boxPrice)}
-                </motion.p>
-              )}
-            </motion.div>
-          );
-        })}
-
-        {/* Message preview */}
-        <AnimatePresence>
-          {(giftMessage || recipientName) && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="flex items-start gap-3 rounded-2xl p-3 overflow-hidden"
-              style={{ background: "rgba(255,45,120,0.07)", border: "1px solid rgba(255,45,120,0.15)" }}>
-              <span className="text-lg shrink-0 mt-0.5">💌</span>
-              <div className="min-w-0">
-                {recipientName && <p className="text-white/40 text-xs">To: <span className="text-white font-bold">{recipientName}</span></p>}
-                {giftMessage && <p className="text-white/60 text-xs italic truncate">&ldquo;{giftMessage}&rdquo;</p>}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Spin reward */}
-        <AnimatePresence>
-          {spinReward && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="flex items-center gap-3 rounded-2xl p-3 overflow-hidden"
-              style={{ background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.2)" }}>
-              <span className="text-lg">🎡</span>
-              <div className="flex-1">
-                <p className="text-yellow-400 font-black text-xs">{spinReward.label}</p>
-                <p className="text-white/30 text-[9px]">Reward applied</p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* Pricing */}
-      <div className="relative z-10">
-        {subtotal > 0 && (
-          <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-            <div className="flex justify-between text-sm text-white/30 mb-1">
-              <span>Box total</span>
-              <span>{formatGELSimple(subtotal)}</span>
-            </div>
-            <div className="flex justify-between font-black text-white text-lg">
-              <span>Est. with shipping</span>
-              <span>{formatGELSimple(subtotal + 500)}</span>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Product Spotlight Card ───────────────────────────────────────────────────
-
-function SpotlightCard({
-  product, isSelected, onSelect, accent,
-}: {
-  product: Product;
-  isSelected: boolean;
-  onSelect: () => void;
-  accent: string;
-}) {
-  const [hovered, setHovered] = useState(false);
-
   return (
     <motion.div
-      className="group relative overflow-hidden rounded-2xl cursor-pointer"
-      onHoverStart={() => setHovered(true)}
-      onHoverEnd={() => setHovered(false)}
       onClick={onSelect}
-      whileHover={{ y: -4 }}
-      whileTap={{ scale: 0.98 }}
-      transition={springs.bouncy}
-      style={{
-        border: isSelected ? `1.5px solid ${accent}` : "1.5px solid rgba(255,255,255,0.07)",
-        boxShadow: isSelected ? `0 0 40px ${accent}30, 0 20px 60px rgba(0,0,0,0.5)` : "0 8px 32px rgba(0,0,0,0.4)",
-        background: isSelected ? `${accent}08` : "rgba(255,255,255,0.025)",
-      }}>
+      className="cursor-pointer group"
+      whileHover="hover"
+      style={{ outline: selected ? "1.5px solid var(--storm)" : "1.5px solid transparent" }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: ease.expo }}>
 
       {/* Image */}
-      <div className="relative aspect-[4/3] overflow-hidden">
-        <Image src={product.images[0]} alt={product.title} fill
-          className={`object-cover transition-transform duration-700 ${hovered ? "scale-108" : "scale-100"}`}
-          sizes="(max-width:768px) 100vw, 50vw" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+      <div className="relative overflow-hidden" style={{ aspectRatio: "3/4" }}>
+        <motion.div className="absolute inset-0"
+          variants={{ hover: { scale: 1.04 } }} transition={{ duration: 0.65, ease: ease.expo }}>
+          <Image src={product.images[0]} alt={product.title} fill className="object-cover" sizes="(max-width:768px) 50vw, 33vw" />
+        </motion.div>
 
         {/* Selected overlay */}
         <AnimatePresence>
-          {isSelected && (
+          {selected && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0 flex items-center justify-center"
-              style={{ background: `${accent}18` }}>
+              style={{ background: "rgba(58,74,92,0.35)" }}>
               <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={springs.bouncy}
-                className="w-16 h-16 rounded-full flex items-center justify-center"
-                style={{ background: accent, boxShadow: `0 0 40px ${accent}60` }}>
-                <Check className="w-8 h-8 text-white" />
+                className="w-14 h-14 flex items-center justify-center rounded-full"
+                style={{ background: "var(--storm)", color: "var(--butter)" }}>
+                <Check className="w-6 h-6" />
               </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Hover CTA */}
+        {/* Hover select hint */}
         <AnimatePresence>
-          {hovered && !isSelected && (
+          {!selected && (
             <motion.div
-              initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 10, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="absolute inset-x-0 bottom-0 p-4">
-              <div className="w-full py-3 rounded-xl text-xs font-black uppercase tracking-widest text-white text-center"
-                style={{ background: `linear-gradient(135deg, ${accent}, ${accent}99)` }}>
-                Select this item
-              </div>
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 0 }} exit={{ opacity: 0 }}
+              className="absolute inset-x-0 bottom-0 p-4"
+              style={{ background: "linear-gradient(to top, rgba(58,74,92,0.7), transparent)" }}
+              variants={{ hover: { opacity: 1, y: 0 } }}>
+              <p className="eyebrow" style={{ color: "rgba(245,230,163,0.8)" }}>Select this item</p>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
       {/* Info */}
-      <div className="p-5">
-        <div className="flex gap-1.5 mb-2.5">
-          {product.vibes.slice(0, 2).map(v => (
-            <span key={v} className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
-              style={{ color: accent, background: `${accent}15` }}>{v}</span>
-          ))}
+      <div className="pt-4 pb-2">
+        <div className="flex items-baseline justify-between mb-1">
+          <h3 className="font-display text-lg font-medium text-storm leading-tight">{product.title}</h3>
+          <span className="font-semibold text-storm text-sm ml-4 shrink-0">{formatGELSimple(product.boxPrice)}</span>
         </div>
-        <h3 className="font-bold text-base text-white mb-0.5 leading-snug">{product.title}</h3>
-        <p className="text-white/35 text-xs mb-3 line-clamp-1">{product.description}</p>
-        <div className="flex items-baseline gap-2">
-          <span className="text-white font-black text-lg">{formatGELSimple(product.boxPrice)}</span>
-          <span className="text-white/25 text-xs line-through">{formatGELSimple(product.normalPrice)}</span>
-          <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full text-white ml-auto"
-            style={{ background: "linear-gradient(135deg, #FF2D78, #7C3AED)" }}>Box</span>
-        </div>
+        <p className="text-sm leading-relaxed" style={{ color: "var(--storm-55)" }}>{product.description}</p>
+        {selected && <p className="eyebrow mt-2" style={{ color: "var(--storm)" }}>✓ Selected</p>}
       </div>
     </motion.div>
   );
 }
 
-// ─── Message Step ─────────────────────────────────────────────────────────────
+// ─── Box summary sidebar ──────────────────────────────────────────────────────
 
-function MessageStep({ message, setMessage, recipientName, setRecipientName, accent }: {
-  message: string; setMessage: (v: string) => void;
-  recipientName: string; setRecipientName: (v: string) => void;
-  accent: string;
+function BoxSummary({ selections, spinReward, subtotal, currentStep }: {
+  selections: Partial<Record<ProductCategory, Product>>;
+  spinReward: SpinReward | null;
+  subtotal: number;
+  currentStep: Step;
 }) {
-  const SUGGESTIONS = [
-    "You make every day brighter 💛",
-    "Just because you deserve it 🌸",
-    "No reason needed — you're simply the best ✨",
-    "Hope this makes you smile as much as you make me 💕",
+  const slots = [
+    { key: "main_surprise" as ProductCategory, label: "Centrepiece" },
+    { key: "sweet_pick"    as ProductCategory, label: "Sweet Pick" },
+    { key: "tiny_extra"    as ProductCategory, label: "Finishing Touch" },
   ];
 
-  const inputStyle = {
-    background: "rgba(255,255,255,0.04)",
-    border: "1px solid rgba(255,255,255,0.09)",
-    outline: "none",
-    transition: "border-color 0.2s, box-shadow 0.2s",
-  };
-
   return (
-    <div className="space-y-6 max-w-xl">
-      <div>
-        <label className="block text-[10px] font-black uppercase tracking-[0.22em] text-white/30 mb-2">For</label>
-        <input type="text" value={recipientName} onChange={e => setRecipientName(e.target.value)}
-          placeholder="Their name (optional)" maxLength={40}
-          className="w-full rounded-xl px-4 py-3.5 text-sm text-white placeholder-white/20"
-          style={inputStyle}
-          onFocus={e => { e.target.style.borderColor = accent; e.target.style.boxShadow = `0 0 0 3px ${accent}18`; }}
-          onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,0.09)"; e.target.style.boxShadow = "none"; }}
-        />
+    <div className="space-y-6">
+      <p className="eyebrow">Your box</p>
+
+      <div className="space-y-3">
+        {slots.map(slot => {
+          const product = selections[slot.key];
+          const isActive = currentStep === slot.key;
+          return (
+            <div key={slot.key} className="flex items-center gap-3 py-3"
+              style={{ borderBottom: "1px solid var(--storm-12)" }}>
+              {product ? (
+                <>
+                  <div className="relative w-12 h-12 shrink-0 overflow-hidden" style={{ outline: "1px solid var(--storm-12)" }}>
+                    <Image src={product.images[0]} alt={product.title} fill className="object-cover" sizes="48px" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-storm truncate">{product.title}</p>
+                    <p className="eyebrow mt-0.5">{formatGELSimple(product.boxPrice)}</p>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-3 w-full">
+                  <div className="w-12 h-12 shrink-0 flex items-center justify-center"
+                    style={{ border: `1px ${isActive ? "solid" : "dashed"} var(--storm-${isActive ? "35" : "18"})` }}>
+                    <div className="w-2 h-2 rounded-full" style={{ background: isActive ? "var(--storm-55)" : "var(--storm-18)" }} />
+                  </div>
+                  <p className="text-sm" style={{ color: isActive ? "var(--storm-55)" : "var(--storm-18)" }}>
+                    {isActive ? "Choose now..." : slot.label}
+                  </p>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      <div>
-        <label className="block text-[10px] font-black uppercase tracking-[0.22em] text-white/30 mb-2">Message</label>
-        <div className="relative">
-          <textarea value={message} onChange={e => setMessage(e.target.value)}
-            placeholder="What do you want them to feel when they open this?" maxLength={240} rows={5}
-            className="w-full rounded-xl px-4 py-4 text-sm text-white placeholder-white/20 resize-none"
-            style={inputStyle}
-            onFocus={e => { e.target.style.borderColor = accent; e.target.style.boxShadow = `0 0 0 3px ${accent}18`; }}
-            onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,0.09)"; e.target.style.boxShadow = "none"; }}
-          />
-          <span className="absolute bottom-3 right-4 text-white/20 text-[10px] tabular-nums">{message.length}/240</span>
+      {spinReward && (
+        <div className="py-3" style={{ borderBottom: "1px solid var(--storm-12)" }}>
+          <p className="eyebrow mb-1">Spin reward</p>
+          <p className="text-sm font-medium text-storm">{spinReward.label}</p>
         </div>
-      </div>
+      )}
 
-      <div className="flex flex-wrap gap-2">
-        {SUGGESTIONS.map(s => (
-          <button key={s} onClick={() => setMessage(s)}
-            className="text-xs px-3 py-2 rounded-lg text-white/35 hover:text-white transition-all text-left"
-            style={{ border: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.025)" }}>
-            {s}
-          </button>
-        ))}
-      </div>
+      {subtotal > 0 && (
+        <div className="flex justify-between items-baseline">
+          <p className="eyebrow">Box subtotal</p>
+          <p className="font-display text-2xl text-storm">{formatGELSimple(subtotal)}</p>
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── Review Panel ─────────────────────────────────────────────────────────────
+// ─── Message step ─────────────────────────────────────────────────────────────
+
+function MessageStep({ message, setMessage, recipientName, setRecipientName }: {
+  message: string; setMessage: (v: string) => void;
+  recipientName: string; setRecipientName: (v: string) => void;
+}) {
+  const PROMPTS = [
+    "You make every day brighter.",
+    "Just because you deserve it.",
+    "No reason needed — you're simply the best.",
+    "Hope this makes you smile as much as you make me.",
+  ];
+
+  return (
+    <div className="max-w-lg space-y-10">
+      <div>
+        <label className="eyebrow block mb-3">For</label>
+        <input type="text" value={recipientName} onChange={e => setRecipientName(e.target.value)}
+          placeholder="Their name (optional)" maxLength={40}
+          className="canvas-input w-full pb-3 text-base" />
+      </div>
+      <div>
+        <label className="eyebrow block mb-3">Your message</label>
+        <div className="relative">
+          <textarea value={message} onChange={e => setMessage(e.target.value)}
+            placeholder="Write something they'll feel..."
+            maxLength={240} rows={5}
+            className="canvas-input w-full pb-3 text-base resize-none" />
+          <span className="absolute bottom-2 right-0 eyebrow tabular-nums">{message.length}/240</span>
+        </div>
+      </div>
+      <div>
+        <p className="eyebrow mb-4">Suggestions</p>
+        <div className="space-y-2">
+          {PROMPTS.map(p => (
+            <button key={p} onClick={() => setMessage(p)}
+              className="block w-full text-left text-sm py-2 border-b transition-colors hover:border-storm"
+              style={{ color: "var(--storm-55)", borderColor: "var(--storm-12)" }}>
+              {p}
+            </button>
+          ))}
+        </div>
+      </div>
+      {(message || recipientName) && (
+        <motion.div className="p-6" style={{ background: "var(--butter-2)", border: "1px solid var(--storm-18)" }}
+          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+          {recipientName && <p className="eyebrow mb-2">To: {recipientName}</p>}
+          {message && <p className="font-display text-xl italic text-storm leading-snug">&ldquo;{message}&rdquo;</p>}
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
+// ─── Review panel ─────────────────────────────────────────────────────────────
 
 function ReviewPanel({ selections, spinReward, subtotal, sessionToken, giftMessage, recipientName }: {
   selections: Partial<Record<ProductCategory, Product>>;
-  spinReward: SpinReward | null;
-  subtotal: number;
-  sessionToken: string;
-  giftMessage: string;
-  recipientName: string;
+  spinReward: SpinReward | null; subtotal: number;
+  sessionToken: string; giftMessage: string; recipientName: string;
 }) {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError]     = useState<string | null>(null);
 
-  const shipping = spinReward?.type === "free_shipping" ? 0 : 500;
+  const shipping     = spinReward?.type === "free_shipping" ? 0 : 500;
   const discountRate = spinReward?.type === "discount_code" && spinReward.value ? parseFloat(String(spinReward.value)) / 100 : 0;
-  const discount = spinReward?.type === "free_tiny_gift" ? (selections.tiny_extra?.boxPrice ?? 0) : Math.round(subtotal * discountRate);
-  const total = subtotal - discount + shipping;
+  const discount     = spinReward?.type === "free_tiny_gift" ? (selections.tiny_extra?.boxPrice ?? 0) : Math.round(subtotal * discountRate);
+  const total        = subtotal - discount + shipping;
 
   async function checkout() {
-    setLoading(true);
+    setLoading(true); setError(null);
     try {
-      const res = await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" },
+      const res  = await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionToken, giftMessage, recipientName }) });
       const data = await res.json();
       if (data.url) window.location.href = data.url;
       else setError(data.error ?? "Checkout unavailable.");
-    } catch { setError("Something went wrong."); }
+    } catch { setError("Something went wrong. Please try again."); }
     finally { setLoading(false); }
   }
 
   return (
-    <div className="max-w-xl space-y-4">
-      {BOX_SLOTS.map(slot => {
-        const product = selections[slot.category as ProductCategory];
-        return (
-          <div key={slot.id} className="flex items-center gap-4 rounded-2xl p-4"
-            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
-            {product ? (
-              <>
-                <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-white/10">
-                  <Image src={product.images[0]} alt={product.title} fill className="object-cover" sizes="64px" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white/30 text-[9px] font-black uppercase tracking-widest mb-0.5">{slot.label}</p>
-                  <p className="text-white font-bold text-sm truncate">{product.title}</p>
-                </div>
-                <p className="text-white font-black text-sm shrink-0">{formatGELSimple(product.boxPrice)}</p>
-              </>
-            ) : (
-              <p className="text-white/25 text-sm">{slot.label} — not chosen</p>
-            )}
-          </div>
-        );
-      })}
+    <div className="max-w-lg space-y-8">
+      {/* Slot items */}
+      <div className="space-y-0" style={{ borderTop: "1px solid var(--storm-12)" }}>
+        {BOX_SLOTS.map(slot => {
+          const product = selections[slot.category as ProductCategory];
+          return (
+            <div key={slot.id} className="py-5 flex items-center gap-5"
+              style={{ borderBottom: "1px solid var(--storm-12)" }}>
+              {product ? (
+                <>
+                  <div className="relative w-16 h-16 shrink-0 overflow-hidden">
+                    <Image src={product.images[0]} alt={product.title} fill className="object-cover" sizes="64px" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="eyebrow mb-1">{slot.label}</p>
+                    <p className="font-display text-lg font-medium text-storm">{product.title}</p>
+                  </div>
+                  <p className="text-storm font-semibold shrink-0">{formatGELSimple(product.boxPrice)}</p>
+                </>
+              ) : (
+                <p style={{ color: "var(--storm-35)" }}>{slot.label} — not selected</p>
+              )}
+            </div>
+          );
+        })}
+      </div>
 
+      {/* Reward */}
       {spinReward && (
-        <div className="flex items-center gap-3 rounded-2xl p-4"
-          style={{ background: "rgba(255,215,0,0.07)", border: "1px solid rgba(255,215,0,0.2)" }}>
-          <span>🎡</span>
-          <p className="text-yellow-400 font-black text-sm flex-1">{spinReward.label}</p>
-          {discount > 0 && <p className="text-yellow-400 font-black text-sm">-{formatGELSimple(discount)}</p>}
-          {spinReward.type === "free_shipping" && <p className="text-emerald-400 font-black text-sm">Free!</p>}
+        <div className="py-4" style={{ borderBottom: "1px solid var(--storm-12)" }}>
+          <p className="eyebrow mb-1">Spin reward applied</p>
+          <p className="font-display text-lg text-storm">{spinReward.label}</p>
         </div>
       )}
 
-      <div className="rounded-2xl p-5 space-y-3"
-        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
-        <div className="flex justify-between text-sm text-white/40"><span>Subtotal</span><span>{formatGELSimple(subtotal)}</span></div>
-        {discount > 0 && <div className="flex justify-between text-sm text-emerald-400"><span>Discount</span><span>-{formatGELSimple(discount)}</span></div>}
-        <div className="flex justify-between text-sm text-white/40">
-          <span>Shipping</span>
-          <span>{spinReward?.type === "free_shipping" ? "Free 🎉" : formatGELSimple(shipping)}</span>
+      {/* Message */}
+      {(giftMessage || recipientName) && (
+        <div className="p-5" style={{ background: "var(--butter-2)", border: "1px solid var(--storm-18)" }}>
+          {recipientName && <p className="eyebrow mb-1">To: {recipientName}</p>}
+          {giftMessage && <p className="font-display text-lg italic text-storm">&ldquo;{giftMessage}&rdquo;</p>}
         </div>
-        <div className="flex justify-between font-black text-white text-2xl border-t border-white/8 pt-3">
-          <span>Total</span><span>{formatGELSimple(total)}</span>
+      )}
+
+      {/* Pricing */}
+      <div className="space-y-3">
+        <div className="flex justify-between text-sm" style={{ color: "var(--storm-55)" }}>
+          <span>Subtotal</span><span>{formatGELSimple(subtotal)}</span>
+        </div>
+        {discount > 0 && (
+          <div className="flex justify-between text-sm" style={{ color: "var(--storm-55)" }}>
+            <span>Reward discount</span><span>−{formatGELSimple(discount)}</span>
+          </div>
+        )}
+        <div className="flex justify-between text-sm" style={{ color: "var(--storm-55)" }}>
+          <span>Shipping</span>
+          <span>{spinReward?.type === "free_shipping" ? "Free" : formatGELSimple(shipping)}</span>
+        </div>
+        <div className="flex justify-between font-display text-3xl pt-4"
+          style={{ borderTop: "1px solid var(--storm-18)" }}>
+          <span>Total</span>
+          <span>{formatGELSimple(total)}</span>
         </div>
       </div>
 
-      {error && <p className="text-red-400 text-sm font-bold text-center">{error}</p>}
+      {error && (
+        <p className="text-sm" style={{ color: "#C0392B" }}>{error}</p>
+      )}
 
-      <motion.button onClick={checkout} disabled={loading} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-        className="w-full py-5 rounded-2xl text-base font-black uppercase tracking-wider text-white flex items-center justify-center gap-3"
-        style={{ background: "linear-gradient(135deg, #10B981, #059669)", boxShadow: "0 0 40px rgba(16,185,129,0.3)" }}>
-        {loading
-          ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          : <><Zap className="w-5 h-5" /> Checkout — {formatGELSimple(total)}</>}
+      <motion.button onClick={checkout} disabled={loading} whileHover={{ opacity: 0.85 }} whileTap={{ scale: 0.98 }}
+        className="btn-primary w-full py-5 text-xs tracking-widest">
+        {loading ? "Processing..." : `Checkout — ${formatGELSimple(total)}`}
       </motion.button>
-
-      <p className="text-center text-white/20 text-xs">🔒 Secure · Gift-wrapped · Delivered in Georgia</p>
+      <p className="text-center eyebrow" style={{ color: "var(--storm-35)" }}>
+        Secure · Gift-wrapped · Delivered in Georgia
+      </p>
     </div>
   );
 }
@@ -490,14 +375,14 @@ function ReviewPanel({ selections, spinReward, subtotal, sessionToken, giftMessa
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function BuildABoxPage() {
-  const [stepIndex, setStepIndex]       = useState(0);
-  const [selections, setSelections]     = useState<Partial<Record<ProductCategory, Product>>>({});
-  const [products, setProducts]         = useState<Record<ProductCategory, Product[]>>(DEMO);
-  const [loading, setLoading]           = useState(true);
-  const [sessionToken, setSessionToken] = useState("");
-  const [spinReward, setSpinReward]     = useState<SpinReward | null>(null);
+  const [stepIndex, setStepIndex]         = useState(0);
+  const [selections, setSelections]       = useState<Partial<Record<ProductCategory, Product>>>({});
+  const [products, setProducts]           = useState<Record<ProductCategory, Product[]>>(DEMO);
+  const [loading, setLoading]             = useState(true);
+  const [sessionToken, setSessionToken]   = useState("");
+  const [spinReward, setSpinReward]       = useState<SpinReward | null>(null);
   const [showSpinWheel, setShowSpinWheel] = useState(false);
-  const [giftMessage, setGiftMessage]   = useState("");
+  const [giftMessage, setGiftMessage]     = useState("");
   const [recipientName, setRecipientName] = useState("");
   const prevStepRef = useRef(stepIndex);
 
@@ -506,7 +391,6 @@ export default function BuildABoxPage() {
   const openMiniCart = useUIStore((s) => s.openMiniCart);
 
   const currentStep = STEPS[stepIndex];
-  const config      = STEP_CONFIG[currentStep];
   const direction   = stepIndex > prevStepRef.current ? 1 : -1;
 
   useEffect(() => { prevStepRef.current = stepIndex; }, [stepIndex]);
@@ -518,9 +402,9 @@ export default function BuildABoxPage() {
       .then(r => r.ok ? r.json() : { products: [] })
       .then((data: { products?: Product[] }) => {
         if (data.products?.length) {
-          const grouped: Record<ProductCategory, Product[]> = { main_surprise: [], sweet_pick: [], tiny_extra: [], lucky_bonus: [] };
-          for (const p of data.products) grouped[p.category as ProductCategory]?.push(p);
-          setProducts(grouped);
+          const g: Record<ProductCategory, Product[]> = { main_surprise: [], sweet_pick: [], tiny_extra: [], lucky_bonus: [] };
+          for (const p of data.products) g[p.category as ProductCategory]?.push(p);
+          setProducts(g);
         }
       })
       .catch(() => {})
@@ -531,16 +415,16 @@ export default function BuildABoxPage() {
     if (sessionToken) return sessionToken;
     try {
       const res = await fetch("/api/boxes", { method: "POST" });
-      const data = await res.json();
-      const token = data.sessionToken ?? `local-${Date.now()}`;
-      localStorage.setItem("box_session_token", token);
-      setSessionToken(token);
-      return token;
+      const d   = await res.json();
+      const tok = d.sessionToken ?? `local-${Date.now()}`;
+      localStorage.setItem("box_session_token", tok);
+      setSessionToken(tok);
+      return tok;
     } catch {
-      const token = `local-${Date.now()}`;
-      localStorage.setItem("box_session_token", token);
-      setSessionToken(token);
-      return token;
+      const tok = `local-${Date.now()}`;
+      localStorage.setItem("box_session_token", tok);
+      setSessionToken(tok);
+      return tok;
     }
   }, [sessionToken]);
 
@@ -554,226 +438,259 @@ export default function BuildABoxPage() {
     setSelections(prev => ({ ...prev, [product.category]: product }));
   }, [ensureSession]);
 
-  function canAdvance() {
+  function canAdvance(): boolean {
     if (currentStep === "main_surprise") return !!selections.main_surprise;
+    if (currentStep === "spin")          return !!spinReward; // must spin before continuing
     if (currentStep === "sweet_pick")    return !!selections.sweet_pick;
     if (currentStep === "tiny_extra")    return !!selections.tiny_extra;
-    if (currentStep === "spin")          return !!spinReward;
-    return true;
+    return true; // message is optional, review always ok
   }
 
   function advance() {
-    if (currentStep === "message") { setShowSpinWheel(true); return; }
+    if (currentStep === "spin" && !spinReward) {
+      // Trigger spin wheel
+      setShowSpinWheel(true);
+      return;
+    }
     if (stepIndex < STEPS.length - 1) setStepIndex(i => i + 1);
   }
+
+  // ── Fixed spin wheel handlers (no double-fire) ────────────────────────────
 
   function handleRewardReceived(reward: SpinReward) {
     setSpinReward(reward);
     setShowSpinWheel(false);
-    setStepIndex(STEPS.indexOf("review"));
+    // Advance to sweet_pick (next step after spin)
+    const spinIdx = STEPS.indexOf("spin");
+    setStepIndex(spinIdx + 1);
+  }
+
+  function handleSpinClose() {
+    setShowSpinWheel(false);
+    // If they already have a reward (closed after winning), advance
+    // spinReward state may not have updated yet, so we check after tick
+    // Actually we do nothing here — the advance button will handle it
   }
 
   const subtotal    = useMemo(() => Object.values(selections).reduce((s, p) => s + (p?.boxPrice ?? 0), 0), [selections]);
   const filledCount = Object.values(selections).filter(Boolean).length;
-  const isProductStep = currentStep === "main_surprise" || currentStep === "sweet_pick" || currentStep === "tiny_extra";
+
+  const productSteps = ["main_surprise", "sweet_pick", "tiny_extra"] as const;
+  const isProductStep = productSteps.includes(currentStep as typeof productSteps[number]);
 
   return (
-    <div className="relative min-h-screen" style={{ background: "#050508" }}>
-      {/* Full-bleed ambient */}
-      <AnimatePresence mode="wait">
-        <motion.div key={currentStep} className="fixed inset-0 pointer-events-none"
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          transition={{ duration: 1 }}
-          style={{ background: config.bg, zIndex: 0 }} />
-      </AnimatePresence>
+    <div style={{ background: "var(--butter)", minHeight: "100dvh" }}>
 
-      {/* Mobile nav */}
-      <nav className="relative z-50 flex items-center justify-between px-5 py-4 border-b border-white/6 lg:hidden"
-        style={{ background: "rgba(5,5,8,0.9)", backdropFilter: "blur(20px)" }}>
-        <Link href="/shop" className="text-white/40 hover:text-white transition-colors">
-          <ArrowLeft className="w-5 h-5" />
+      {/* Nav */}
+      <nav className="sticky top-0 z-40 px-8 sm:px-12 h-16 flex items-center justify-between"
+        style={{ background: "rgba(245,230,163,0.95)", backdropFilter: "blur(16px)", borderBottom: "1px solid var(--storm-12)" }}>
+        <Link href="/shop"
+          className="flex items-center gap-2 text-sm transition-opacity hover:opacity-60"
+          style={{ color: "var(--storm-55)" }}>
+          <ArrowLeft className="w-4 h-4" /> Shop
         </Link>
-        <Link href="/" className="font-display text-xl font-bold text-white">
-          gamif<span style={{ color: config.accent }}>.</span>
+        <Link href="/" className="font-display text-xl font-bold text-storm">
+          gamif<span style={{ opacity: 0.35 }}>.</span>
         </Link>
-        <button onClick={openMiniCart} className="relative text-white/40 hover:text-white transition-colors">
-          <ShoppingCart className="w-5 h-5" />
-          {cartCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 text-[9px] font-black rounded-full flex items-center justify-center text-white"
-              style={{ background: config.accent }}>{cartCount}</span>
+        <div className="flex items-center gap-4">
+          {subtotal > 0 && (
+            <span className="font-display text-base text-storm hidden sm:block">{formatGELSimple(subtotal)}</span>
           )}
-        </button>
+          <button onClick={openMiniCart} className="relative" aria-label="Cart"
+            style={{ color: "var(--storm-55)" }}>
+            <ShoppingCart className="w-4 h-4" />
+            <AnimatePresence>
+              {cartCount > 0 && (
+                <motion.span key={cartCount} initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
+                  className="absolute -top-1.5 -right-1.5 w-4 h-4 text-[8px] font-bold rounded-full flex items-center justify-center"
+                  style={{ background: "var(--storm)", color: "var(--butter)" }}>
+                  {cartCount}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </button>
+        </div>
       </nav>
 
-      {/* Desktop: split layout */}
-      <div className="relative z-10 lg:grid lg:grid-cols-[420px_1fr] lg:min-h-screen">
+      {/* Progress */}
+      <div className="px-8 sm:px-12 py-4 flex items-center gap-3 overflow-x-auto"
+        style={{ borderBottom: "1px solid var(--storm-08)" }}>
+        {STEPS.filter(s => s !== "spin").map((s, i) => {
+          const stepDone = stepIndex > STEPS.indexOf(s);
+          const stepActive = currentStep === s;
+          return (
+            <div key={s} className="flex items-center gap-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full transition-all"
+                  style={{ background: stepDone || stepActive ? "var(--storm)" : "var(--storm-18)" }} />
+                <span className="eyebrow transition-colors"
+                  style={{ color: stepActive ? "var(--storm)" : stepDone ? "var(--storm-55)" : "var(--storm-18)" }}>
+                  {STEP_LABEL[s]}
+                </span>
+              </div>
+              {i < STEPS.filter(s2 => s2 !== "spin").length - 1 && (
+                <div className="w-6 h-px" style={{ background: "var(--storm-18)" }} />
+              )}
+            </div>
+          );
+        })}
+        {spinReward && (
+          <span className="eyebrow ml-2" style={{ color: "var(--storm-55)" }}>
+            · {spinReward.label}
+          </span>
+        )}
+      </div>
 
-        {/* LEFT PANEL — sticky */}
-        <div className="hidden lg:block">
-          <div className="sticky top-0 h-screen border-r border-white/6"
-            style={{ background: "rgba(5,5,8,0.6)", backdropFilter: "blur(24px)" }}>
-            <GiftPreviewPanel
-              selections={selections}
-              giftMessage={giftMessage}
-              recipientName={recipientName}
-              spinReward={spinReward}
-              subtotal={subtotal}
-              currentStep={currentStep}
-            />
-          </div>
-        </div>
+      {/* Main layout */}
+      <div className="max-w-8xl mx-auto px-8 sm:px-12 py-12 lg:grid lg:grid-cols-[1fr_320px] lg:gap-16">
 
-        {/* RIGHT PANEL — scrollable content */}
-        <div className="min-h-screen flex flex-col">
+        {/* Content */}
+        <div>
           {/* Step header */}
           <AnimatePresence mode="wait">
-            <motion.div
-              key={currentStep + "-hdr"}
-              className="px-6 sm:px-10 pt-16 pb-8"
-              initial={{ opacity: 0, y: 30, filter: "blur(10px)" }}
+            <motion.div key={currentStep + "-hdr"} className="mb-12"
+              initial={{ opacity: 0, y: 20, filter: "blur(6px)" }}
               animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-              exit={{ opacity: 0, y: -16 }}
-              transition={{ duration: 0.55, ease: ease.expo }}>
-              <p className="text-[10px] font-black uppercase tracking-[0.25em] mb-3" style={{ color: config.accent }}>
-                {config.eyebrow}
-              </p>
-              <h1 className="font-display font-bold text-white leading-[0.9] mb-3"
-                style={{ fontSize: "clamp(3rem, 7vw, 6rem)" }}>
-                {config.title}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.5, ease: ease.expo }}>
+              <p className="eyebrow mb-4">{STEP_COPY[currentStep].eyebrow}</p>
+              <h1 className="font-display font-light text-storm leading-tight mb-3"
+                style={{ fontSize: "clamp(2.5rem, 6vw, 6rem)" }}>
+                {STEP_COPY[currentStep].title}
               </h1>
-              <p className="text-white/40 text-base leading-relaxed max-w-sm">{config.subtitle}</p>
+              <p style={{ color: "var(--storm-55)", fontSize: "0.95rem", maxWidth: "36ch" }}>
+                {STEP_COPY[currentStep].sub}
+              </p>
             </motion.div>
           </AnimatePresence>
 
           {/* Step content */}
-          <div className="flex-1 px-6 sm:px-10 pb-40">
-            <AnimatePresence mode="wait" custom={direction}>
-              {isProductStep && (
-                <motion.div
-                  key={currentStep}
-                  custom={direction}
-                  initial={{ opacity: 0, x: direction * 60, filter: "blur(8px)" }}
-                  animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, x: -direction * 60, filter: "blur(8px)" }}
-                  transition={{ duration: 0.5, ease: ease.expo }}>
-                  {loading ? (
-                    <div className="grid sm:grid-cols-2 gap-4">
-                      {[1,2,3].map(i => <div key={i} className="aspect-[4/3] rounded-2xl animate-pulse" style={{ background: "rgba(255,255,255,0.04)" }} />)}
-                    </div>
-                  ) : (
-                    <div className="grid sm:grid-cols-2 gap-4">
-                      {(products[currentStep as ProductCategory] ?? []).map(product => (
-                        <SpotlightCard
-                          key={product.id}
-                          product={product}
-                          isSelected={selections[currentStep as ProductCategory]?.id === product.id}
-                          onSelect={() => selectProduct(product)}
-                          accent={config.accent}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </motion.div>
-              )}
+          <AnimatePresence mode="wait" custom={direction}>
+            {isProductStep && (
+              <motion.div key={currentStep}
+                custom={direction}
+                initial={{ opacity: 0, x: direction * 40 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -direction * 40 }}
+                transition={{ duration: 0.45, ease: ease.expo }}>
+                {loading ? (
+                  <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-8">
+                    {[1,2,3].map(i => (
+                      <div key={i} className="shimmer" style={{ aspectRatio: "3/4" }} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-8">
+                    {(products[currentStep as ProductCategory] ?? []).map(product => (
+                      <GalleryCard key={product.id} product={product}
+                        selected={selections[currentStep as ProductCategory]?.id === product.id}
+                        onSelect={() => selectProduct(product)} />
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
 
-              {currentStep === "message" && (
-                <motion.div key="message"
-                  initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                  transition={{ duration: 0.5, ease: ease.expo }}>
-                  <MessageStep
-                    message={giftMessage} setMessage={setGiftMessage}
-                    recipientName={recipientName} setRecipientName={setRecipientName}
-                    accent={config.accent}
-                  />
-                </motion.div>
-              )}
-
-              {currentStep === "spin" && (
-                <motion.div key="spin" className="text-center py-16"
-                  initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0 }} transition={{ duration: 0.5, ease: ease.expo }}>
-                  {spinReward ? (
-                    <div className="space-y-5">
-                      <div className="text-7xl mb-4">🎉</div>
-                      <h2 className="font-display text-4xl font-bold text-white">{spinReward.label}</h2>
-                      <p className="text-white/40">Applied to your order automatically.</p>
-                      <button onClick={() => setStepIndex(STEPS.indexOf("review"))}
-                        className="px-8 py-4 rounded-full text-sm font-black uppercase tracking-wider text-white mt-6 inline-flex items-center gap-2"
-                        style={{ background: "linear-gradient(135deg, #FF2D78, #7C3AED)" }}>
-                        Review Order <ArrowRight className="w-4 h-4" />
-                      </button>
+            {currentStep === "spin" && (
+              <motion.div key="spin" className="py-8"
+                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }} transition={{ duration: 0.45 }}>
+                {spinReward ? (
+                  <div className="max-w-sm space-y-6">
+                    <div className="p-8" style={{ background: "var(--butter-2)", border: "1px solid var(--storm-18)" }}>
+                      <p className="eyebrow mb-3">Reward earned</p>
+                      <p className="font-display text-3xl font-medium text-storm mb-2">{spinReward.label}</p>
+                      <p style={{ color: "var(--storm-55)", fontSize: "0.875rem" }}>Applied at checkout automatically.</p>
                     </div>
-                  ) : (
-                    <div className="space-y-6 max-w-sm mx-auto">
-                      <motion.div className="text-8xl" animate={{ rotate: [0, 360] }} transition={{ duration: 15, repeat: Infinity, ease: "linear" }}>🎡</motion.div>
-                      <h2 className="font-display text-4xl font-bold text-white">Your box is complete.</h2>
-                      <p className="text-white/40 text-lg leading-relaxed">Spin for a reward — free gifts, discounts, or a surprise upgrade.</p>
-                      <button onClick={() => setShowSpinWheel(true)}
-                        className="px-10 py-5 rounded-full text-base font-black uppercase tracking-wider text-white inline-flex items-center gap-3"
-                        style={{ background: "linear-gradient(135deg, #FFD700, #F5A623)", color: "#0A0A12", boxShadow: "0 0 40px rgba(255,215,0,0.4)" }}>
-                        <Zap className="w-5 h-5" /> Spin the Wheel
-                      </button>
-                    </div>
-                  )}
-                </motion.div>
-              )}
+                    <motion.button onClick={() => setStepIndex(STEPS.indexOf("sweet_pick"))}
+                      className="btn-primary px-8 py-4 text-xs tracking-widest flex items-center gap-2"
+                      whileHover={{ opacity: 0.85 }}>
+                      Continue <ArrowRight className="w-3.5 h-3.5" />
+                    </motion.button>
+                  </div>
+                ) : (
+                  <div className="max-w-sm space-y-6">
+                    <p style={{ color: "var(--storm-55)", fontSize: "0.95rem", lineHeight: 1.7 }}>
+                      You chose your centrepiece. Every order at Gamif earns a spin reward — free gifts, discounts, or a surprise upgrade.
+                    </p>
+                    <motion.button onClick={() => setShowSpinWheel(true)}
+                      className="btn-primary px-8 py-4 text-xs tracking-widest"
+                      whileHover={{ opacity: 0.85 }} whileTap={{ scale: 0.97 }}>
+                      Spin the Wheel
+                    </motion.button>
+                  </div>
+                )}
+              </motion.div>
+            )}
 
-              {currentStep === "review" && (
-                <motion.div key="review"
-                  initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }} transition={{ duration: 0.5, ease: ease.expo }}>
-                  <ReviewPanel selections={selections} spinReward={spinReward} subtotal={subtotal}
-                    sessionToken={sessionToken} giftMessage={giftMessage} recipientName={recipientName} />
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {currentStep === "message" && (
+              <motion.div key="message"
+                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }} transition={{ duration: 0.45 }}>
+                <MessageStep message={giftMessage} setMessage={setGiftMessage}
+                  recipientName={recipientName} setRecipientName={setRecipientName} />
+              </motion.div>
+            )}
+
+            {currentStep === "review" && (
+              <motion.div key="review"
+                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }} transition={{ duration: 0.45 }}>
+                <ReviewPanel selections={selections} spinReward={spinReward} subtotal={subtotal}
+                  sessionToken={sessionToken} giftMessage={giftMessage} recipientName={recipientName} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Sidebar */}
+        <div className="hidden lg:block">
+          <div className="sticky top-24">
+            <BoxSummary selections={selections} spinReward={spinReward} subtotal={subtotal} currentStep={currentStep} />
           </div>
         </div>
       </div>
 
       {/* Bottom action bar */}
       {currentStep !== "review" && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 p-4 safe-bottom">
-          <motion.div
-            className="max-w-5xl mx-auto lg:ml-[420px] rounded-2xl px-5 py-4 flex items-center gap-4"
-            style={{ background: "rgba(5,5,8,0.95)", backdropFilter: "blur(24px)", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 -8px 48px rgba(0,0,0,0.6)" }}
-            initial={{ y: 80 }} animate={{ y: 0 }} transition={springs.gentle}>
-            <div className="flex-1 min-w-0">
-              {subtotal > 0 && (
-                <p className="text-white font-bold text-sm">
-                  Box: <span style={{ color: config.accent }}>{formatGELSimple(subtotal)}</span>
-                </p>
+        <div className="fixed bottom-0 left-0 right-0 z-40 safe-bottom"
+          style={{ background: "rgba(245,230,163,0.97)", backdropFilter: "blur(16px)", borderTop: "1px solid var(--storm-12)" }}>
+          <div className="max-w-8xl mx-auto px-8 sm:px-12 h-16 flex items-center justify-between">
+            <div>
+              {filledCount > 0 && (
+                <p className="text-sm font-medium text-storm">{filledCount}/3 items chosen</p>
               )}
-              <p className="text-white/30 text-xs">
-                {filledCount === 3
-                  ? currentStep === "message" ? "Add a message or skip" : "Almost there"
-                  : `${3 - filledCount} item${3 - filledCount !== 1 ? "s" : ""} left to choose`}
+              <p className="eyebrow" style={{ color: "var(--storm-35)" }}>
+                {currentStep === "spin" && !spinReward ? "Spin to continue" :
+                 currentStep === "message" ? "Message is optional — you can skip" :
+                 !canAdvance() ? "Choose an item to continue" : ""}
               </p>
             </div>
-
-            <motion.button onClick={advance} disabled={!canAdvance()}
-              className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-black uppercase tracking-wider shrink-0 text-white transition-all"
-              style={canAdvance()
-                ? { background: `linear-gradient(135deg, ${config.accent}, ${config.accent}99)`, boxShadow: `0 0 24px ${config.accent}40` }
-                : { background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.2)", cursor: "not-allowed" }}
-              whileHover={canAdvance() ? { scale: 1.04 } : {}}
-              whileTap={canAdvance() ? { scale: 0.96 } : {}}>
-              {currentStep === "message" ? <><Sparkles className="w-4 h-4" /> Spin!</>
-                : currentStep === "spin" && spinReward ? <><ArrowRight className="w-4 h-4" /> Review</>
-                : <><ArrowRight className="w-4 h-4" /> Next</>}
+            <motion.button
+              onClick={advance}
+              disabled={!canAdvance() && !(currentStep === "spin" && !spinReward)}
+              className="flex items-center gap-2 px-8 py-3 text-xs tracking-widest transition-all"
+              style={
+                canAdvance() || (currentStep === "spin" && !spinReward)
+                  ? { background: "var(--storm)", color: "var(--butter)" }
+                  : { background: "var(--storm-12)", color: "var(--storm-35)", cursor: "not-allowed" }
+              }
+              whileHover={canAdvance() || (currentStep === "spin" && !spinReward) ? { opacity: 0.85 } : {}}
+              whileTap={canAdvance() || (currentStep === "spin" && !spinReward) ? { scale: 0.97 } : {}}>
+              {currentStep === "spin" && !spinReward ? "Spin the Wheel" :
+               currentStep === "message" ? "Continue →" :
+               currentStep === "tiny_extra" ? "Next →" : "Next →"}
             </motion.button>
-          </motion.div>
+          </div>
         </div>
       )}
 
+      {/* Spin wheel overlay — keeps its own dark aesthetic as a dramatic contrast moment */}
       {showSpinWheel && (
         <LuckySpinWheel
           sessionToken={sessionToken || `local-${Date.now()}`}
           onRewardReceived={handleRewardReceived}
-          onClose={() => {
-            setShowSpinWheel(false);
-            if (spinReward) setStepIndex(STEPS.indexOf("review"));
-          }}
+          onClose={handleSpinClose}
         />
       )}
     </div>

@@ -1,0 +1,1286 @@
+<!DOCTYPE html>
+<!--
+  Gamif homepage — scroll-driven hero + arch reveal + section narrative.
+  The interactive build experience now lives at /build (build.html).
+  In the React/Vite app, this maps to: pages/index.tsx + pages/build.tsx.
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gamif — Build · Spin · Unbox. Premium Mystery Boxes, Tbilisi.</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500&family=Raleway:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --cream:       #F1E7D6;
+    --cream-deep:  #E6D8C0;
+    --cream-warm:  #F8EFD9;
+    --ink:         #3A2820;
+    --ink-soft:    #5A4030;
+    --ink-deep:    #2B1B14;
+
+    --sun-1:       #FFE9B8;
+    --sun-2:       #FBC97A;
+    --sun-3:       #F4B860;
+    --sun-4:       #E89945;
+    --sun-5:       #C26F22;
+    --sun-6:       #884812;
+
+    --burg:        #4A1F1A;
+    --burg-deep:   #2E1410;
+    --burg-mid:    #6B2A22;
+
+    --muted:       rgba(58, 40, 32, 0.5);
+    --line:        rgba(58, 40, 32, 0.14);
+}
+
+html { scroll-behavior: smooth; }
+body {
+    background: var(--cream);
+    color: var(--ink);
+    font-family: 'Raleway', sans-serif;
+    font-weight: 300;
+    overflow-x: hidden;
+    cursor: none;
+    line-height: 1.5;
+}
+body.modal-open { overflow: hidden; }
+::selection { background: var(--sun-4); color: var(--ink-deep); }
+
+body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.6'/></svg>");
+    opacity: 0.05;
+    pointer-events: none;
+    z-index: 9990;
+}
+
+.cursor-dot {
+    width: 6px; height: 6px;
+    background: var(--sun-4);
+    border-radius: 50%;
+    position: fixed; pointer-events: none;
+    z-index: 10001;
+    transform: translate(-50%, -50%);
+    transition: width .18s, height .18s, background .25s;
+}
+.cursor-ring {
+    width: 34px; height: 34px;
+    border: 1px solid var(--sun-4);
+    border-radius: 50%;
+    position: fixed; pointer-events: none;
+    z-index: 10000;
+    transform: translate(-50%, -50%);
+    transition: width .35s cubic-bezier(.25,.46,.45,.94), height .35s, opacity .3s;
+    opacity: .55;
+}
+
+::-webkit-scrollbar { width: 2px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--sun-4); }
+
+/* PRELOADER */
+.preloader {
+    position: fixed; inset: 0; z-index: 10010;
+    background: var(--cream);
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 28px;
+    transition: opacity .8s ease, visibility .8s;
+}
+.preloader.gone { opacity: 0; visibility: hidden; pointer-events: none; }
+.preloader.fast .pre-progress::after { animation-duration: .6s; }
+.pre-orb {
+    width: 84px; height: 108px;
+    border-radius: 50px 50px 6px 6px;
+    background: radial-gradient(circle at 38% 32%, var(--sun-2) 0%, var(--sun-3) 35%, var(--sun-4) 65%, var(--sun-5) 100%);
+    box-shadow:
+        inset -8px -10px 20px rgba(120, 50, 10, 0.35),
+        inset 6px 6px 14px rgba(255, 240, 200, 0.4),
+        0 6px 40px rgba(244, 184, 96, 0.4);
+    animation: preFloat 2s ease-in-out infinite;
+}
+@keyframes preFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+.pre-text {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 500; font-size: 16px;
+    letter-spacing: .28em; color: var(--ink-soft);
+}
+.pre-text em { font-style: italic; font-weight: 400; margin: 0 .2em; }
+.pre-progress { margin-top: 10px; width: 60px; height: 1px; background: var(--line); overflow: hidden; position: relative; }
+.pre-progress::after {
+    content: ''; position: absolute; inset: 0;
+    background: var(--sun-4); transform: translateX(-100%);
+    animation: preFill 1.6s ease-out forwards;
+}
+@keyframes preFill { to { transform: translateX(0); } }
+
+/* NAV */
+nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 26px 48px;
+    color: var(--cream-warm);
+    transition: color .6s ease;
+}
+.nav-logo {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 500; font-size: 17px;
+    letter-spacing: .22em; text-decoration: none;
+    display: flex; align-items: center; gap: 12px;
+    color: inherit;
+}
+.nav-logo::before {
+    content: ''; width: 10px; height: 10px;
+    border-radius: 50%; background: var(--sun-4);
+}
+.nav-links { display: flex; gap: 44px; align-items: center; }
+.nav-links a {
+    font-size: 10px; letter-spacing: .22em;
+    text-transform: uppercase; text-decoration: none;
+    color: inherit; opacity: .65;
+    transition: opacity .3s; position: relative;
+}
+.nav-links a.active { opacity: 1; }
+.nav-links a::after {
+    content: ''; position: absolute;
+    bottom: -4px; left: 0; width: 0; height: 1px;
+    background: currentColor; transition: width .3s;
+}
+.nav-links a:hover::after, .nav-links a.active::after { width: 100%; }
+
+.nav-cta {
+    font-size: 10px; letter-spacing: .2em;
+    text-transform: uppercase;
+    background: var(--cream-warm); color: var(--ink-deep);
+    padding: 10px 22px; border-radius: 100px;
+    text-decoration: none;
+    display: inline-flex; align-items: center; gap: 14px;
+    transition: transform .3s;
+    border: none; cursor: none;
+    font-family: 'Raleway', sans-serif;
+}
+.nav-cta::after {
+    content: '→'; background: var(--sun-4); color: var(--ink-deep);
+    width: 24px; height: 24px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 13px;
+}
+.nav-cta:hover { transform: scale(1.04); }
+
+.hamburger {
+    display: none;
+    background: transparent; border: 0; cursor: none;
+    width: 32px; height: 24px; position: relative;
+    color: inherit;
+}
+.hamburger span {
+    position: absolute; left: 0; right: 0; height: 1.5px;
+    background: currentColor;
+    transition: transform .3s, top .3s, opacity .3s;
+}
+.hamburger span:nth-child(1) { top: 4px; }
+.hamburger span:nth-child(2) { top: 50%; transform: translateY(-50%); }
+.hamburger span:nth-child(3) { bottom: 4px; }
+.hamburger.open span:nth-child(1) { top: 50%; transform: translateY(-50%) rotate(45deg); }
+.hamburger.open span:nth-child(2) { opacity: 0; }
+.hamburger.open span:nth-child(3) { bottom: auto; top: 50%; transform: translateY(-50%) rotate(-45deg); }
+
+.mobile-menu {
+    position: fixed; inset: 0;
+    background: var(--burg-deep);
+    z-index: 999;
+    transform: translateX(100%);
+    transition: transform .5s cubic-bezier(.7,0,.3,1);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 28px;
+}
+.mobile-menu.open { transform: translateX(0); }
+.mobile-menu a {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 38px; letter-spacing: .04em;
+    color: var(--cream-warm); text-decoration: none;
+    transition: color .25s;
+}
+.mobile-menu a:hover, .mobile-menu a.active { color: var(--sun-3); }
+.mobile-menu .mm-cta {
+    margin-top: 16px;
+    font-family: 'Raleway', sans-serif;
+    font-size: 11px; letter-spacing: .22em;
+    text-transform: uppercase;
+    background: var(--sun-4); color: var(--ink-deep);
+    padding: 14px 32px; border-radius: 100px;
+    text-decoration: none;
+}
+
+/* HERO */
+.hero-scroll { position: relative; height: 500vh; background: var(--burg-deep); color: var(--cream-warm); }
+.hero-sticky { position: sticky; top: 0; height: 100vh; overflow: hidden; background: var(--burg-deep); transition: background-color .6s ease; }
+.backdrop-glow {
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 65%,
+        rgba(244, 184, 96, 0.22) 0%,
+        rgba(194, 111, 34, 0.10) 28%,
+        transparent 60%);
+    pointer-events: none;
+    transition: opacity .4s ease;
+}
+.orb-wrap {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%) translateY(var(--orb-y, 0px)) translateX(var(--orb-x, 0px)) scale(var(--orb-scale, 0.18));
+    transform-origin: center center;
+    will-change: transform;
+    transition: transform .12s linear;
+    z-index: 4;
+}
+.orb {
+    width: 85vmin; height: 85vmin;
+    max-width: 780px; max-height: 780px;
+    border-radius: 50%; position: relative;
+    background: radial-gradient(circle at 36% 30%,
+        #FFEFCC 0%, #FFD89A 15%, #FBC97A 32%,
+        #F4B860 50%, #DC9036 72%, #B86524 92%, #6A3810 100%);
+    box-shadow:
+        inset -40px -55px 100px rgba(60, 25, 5, 0.55),
+        inset 30px 40px 80px rgba(255, 245, 220, 0.30),
+        0 0 80px rgba(255, 200, 120, 0.45),
+        0 0 180px rgba(220, 140, 60, 0.22);
+}
+.orb::after {
+    content: ''; position: absolute; inset: 4%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, rgba(255,255,255,0.16) 0%, transparent 35%);
+    pointer-events: none;
+}
+.orb::before {
+    content: ''; position: absolute;
+    top: 58%; left: 30%;
+    width: 55%; height: 10%;
+    background: radial-gradient(ellipse at center,
+        rgba(160, 70, 20, 0.30) 0%, rgba(160, 70, 20, 0.16) 35%, transparent 75%);
+    border-radius: 50%;
+    transform: rotate(-8deg);
+    pointer-events: none;
+}
+
+.scene {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+    pointer-events: none;
+    opacity: 0; z-index: 5;
+    transition: opacity .35s ease;
+    padding: 0 48px; text-align: center;
+}
+.scene > * { pointer-events: auto; }
+.scene-1 { color: var(--ink-soft); }
+.scene-1 .casa-label {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 500; font-size: 15px;
+    letter-spacing: .28em; color: var(--ink-soft);
+    margin-top: 280px;
+}
+.scene-1 .casa-label em { font-style: italic; font-weight: 400; margin: 0 .2em; }
+.scene-2 { color: var(--cream-warm); justify-content: flex-end; padding-bottom: 56px; }
+.scroll-discover {
+    font-size: 11px; letter-spacing: .22em;
+    text-transform: uppercase; color: var(--cream-warm);
+    opacity: .85;
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+}
+.scroll-discover .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%; background: var(--sun-4);
+    box-shadow: 0 0 14px rgba(244, 184, 96, .8);
+    animation: discoverDot 2s ease-in-out infinite;
+}
+@keyframes discoverDot {
+    0%, 100% { transform: translateY(0); opacity: 1; }
+    50% { transform: translateY(8px); opacity: .5; }
+}
+.scene-3 .wordmark {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic; font-weight: 300;
+    font-size: clamp(110px, 22vw, 320px);
+    line-height: 0.9; letter-spacing: -.02em;
+    color: var(--cream-warm);
+    text-shadow: 0 4px 60px rgba(0,0,0,0.18);
+}
+.scene-3 .caption {
+    margin-top: 24px;
+    font-size: 12px; letter-spacing: .2em;
+    text-transform: uppercase; color: rgba(248, 239, 217, 0.7);
+}
+.scene-4 { background: linear-gradient(180deg, transparent 0%, rgba(74, 31, 26, 0.45) 100%); }
+.scene-4 .editorial {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 400;
+    font-size: clamp(60px, 11vw, 180px);
+    line-height: .92; letter-spacing: -.025em;
+    color: var(--cream-warm);
+    max-width: 1200px; text-align: center;
+}
+.scene-4 .editorial em { font-style: italic; font-weight: 300; color: var(--sun-3); }
+.scene-4 .editorial .star {
+    color: var(--sun-3); font-style: normal;
+    font-size: .55em; vertical-align: super; margin-left: .08em;
+}
+.scene-4 .editorial-sub {
+    margin-top: 36px;
+    font-family: 'Raleway', sans-serif;
+    font-size: 11px; letter-spacing: .3em;
+    text-transform: uppercase;
+    color: rgba(248, 239, 217, 0.55);
+}
+
+.progress-rail {
+    position: fixed; top: 50%; right: 28px;
+    transform: translateY(-50%);
+    z-index: 999;
+    width: 2px; height: 200px;
+    background: rgba(255,255,255,0.12);
+    opacity: 0; transition: opacity .5s ease;
+}
+.progress-rail.visible { opacity: 1; }
+.progress-rail::after {
+    content: ''; position: absolute;
+    top: 0; left: -2px; right: -2px;
+    height: var(--prog, 0%);
+    background: var(--sun-4);
+    transition: height .15s linear;
+}
+
+.tagline-corner {
+    position: absolute; bottom: 36px; left: 48px;
+    z-index: 7;
+    display: flex; align-items: center; gap: 12px;
+    color: var(--cream-warm);
+    opacity: .6;
+    font-size: 11px; letter-spacing: .15em;
+    pointer-events: none;
+}
+.tagline-corner .mini-orb {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #FFE9B8, #F4B860 60%, #B86524);
+    box-shadow: 0 0 12px rgba(244,184,96,.5);
+}
+.tagline-corner em { font-style: italic; }
+
+/* EDITORIAL */
+.editorial-section {
+    background: var(--sun-2);
+    color: var(--ink-deep);
+    padding: 200px 48px 140px;
+    position: relative; overflow: hidden;
+}
+.editorial-section .ed-eyebrow {
+    text-align: center;
+    font-size: 11px; letter-spacing: .35em;
+    text-transform: uppercase;
+    margin-bottom: 90px;
+    color: var(--ink-soft);
+}
+.editorial-section .ed-eyebrow::before,
+.editorial-section .ed-eyebrow::after {
+    content: '·'; margin: 0 14px; color: var(--ink-soft);
+}
+.editorial-section .ed-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 400;
+    font-size: clamp(70px, 13vw, 220px);
+    line-height: .88; letter-spacing: -.025em;
+    text-align: center; color: var(--ink-deep);
+    max-width: 1400px; margin: 0 auto;
+}
+.editorial-section .ed-title em { font-style: italic; font-weight: 300; }
+.editorial-section .ed-title .star {
+    font-size: .45em; vertical-align: super;
+    color: var(--ink-deep); margin-left: .04em;
+}
+
+/* ════════════════════════════════════════════════════ */
+/*  ARCH / DOOR SCROLL REVEAL  (new — replaces static .editorial-image) */
+/* ════════════════════════════════════════════════════ */
+.door-scroll {
+    position: relative;
+    height: 260vh;
+    background: linear-gradient(180deg, var(--sun-2) 0%, var(--sun-2) 30%, var(--cream-deep) 30%, var(--cream-deep) 100%);
+}
+.door-sticky {
+    position: sticky; top: 0;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--cream-deep);
+}
+/* The yellow band at the top retracts as you scroll */
+.door-sky {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: var(--sky-height, 38%);
+    background: var(--sun-2);
+    z-index: 1;
+    transition: height .12s linear;
+    will-change: height;
+}
+.door-sky::after {
+    /* curved bottom edge that hugs the arch */
+    content: '';
+    position: absolute;
+    left: 50%; bottom: -1px;
+    transform: translateX(-50%);
+    width: var(--arch-w, 0px);
+    height: calc(var(--arch-w, 0px) / 2);
+    background: var(--cream-deep);
+    border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+    transition: width .12s linear, height .12s linear;
+    will-change: width, height;
+}
+/* The arch itself — grows on scroll */
+.door-arch-wrap {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -45%);
+    z-index: 2;
+    pointer-events: none;
+}
+.door-arch {
+    width: var(--arch-w, 0px);
+    height: var(--arch-h, 0px);
+    border-radius: 999px 999px 6px 6px;
+    background: linear-gradient(165deg, #6B4A35 0%, #3A2820 55%, #1F140E 100%);
+    position: relative;
+    overflow: hidden;
+    transition: width .12s linear, height .12s linear;
+    will-change: width, height;
+    box-shadow: 0 30px 60px rgba(46,20,16,0.25);
+}
+.door-arch::before {
+    /* atmospheric glow inside */
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(circle at 50% 60%,
+        rgba(244, 184, 96, 0.45) 0%,
+        rgba(220, 144, 54, 0.20) 30%,
+        transparent 65%);
+}
+/* Floating orb inside the arch */
+.door-scene-orb {
+    position: absolute;
+    top: 52%; left: 50%;
+    width: 38%; aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(circle at 36% 30%,
+        #FFEFCC 0%, #FFD89A 18%, #FBC97A 38%,
+        #F4B860 60%, #DC9036 85%, #B86524 100%);
+    box-shadow:
+        inset -10px -14px 28px rgba(60,25,5,.4),
+        inset 8px 10px 20px rgba(255,245,220,.25),
+        0 0 60px rgba(244,184,96,.45),
+        0 0 140px rgba(220,140,60,.3);
+    z-index: 2;
+}
+/* Curtain-like script wordmark hovering inside the arch */
+.door-scene-text {
+    position: absolute;
+    top: 28%; left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 22px;
+    color: rgba(248,239,217,0.55);
+    letter-spacing: -.01em;
+    z-index: 3;
+    white-space: nowrap;
+}
+/* Sparkles inside the arch */
+.door-scene-spark {
+    position: absolute;
+    top: var(--y); left: var(--x);
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--sun-2);
+    box-shadow: 0 0 10px rgba(244,184,96,.7);
+    transform: translate(-50%,-50%);
+    opacity: var(--o, .8);
+    z-index: 2;
+}
+
+/* Side text + CTA, fade in once arch is big */
+.door-side {
+    position: absolute;
+    z-index: 6;
+    left: 6%;
+    top: 50%;
+    transform: translateY(-50%);
+    max-width: 320px;
+    opacity: var(--door-side-op, 0);
+    transition: opacity .5s ease;
+    pointer-events: none;
+}
+.door-side > * { pointer-events: auto; }
+.door-side-eyebrow {
+    font-size: 10px; letter-spacing: .3em;
+    text-transform: uppercase;
+    color: var(--sun-5);
+    margin-bottom: 16px;
+}
+.door-side-body {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 400;
+    font-size: 22px; line-height: 1.45;
+    color: var(--ink-deep);
+    margin-bottom: 36px;
+}
+.door-side-body em { font-style: italic; color: var(--burg-mid); }
+.door-cta {
+    display: inline-flex;
+    align-items: center; gap: 12px;
+    background: var(--cream-warm);
+    color: var(--ink-deep);
+    padding: 8px 8px 8px 24px;
+    border-radius: 100px;
+    text-decoration: none;
+    font-family: 'Raleway', sans-serif;
+    font-size: 11px; letter-spacing: .22em;
+    text-transform: uppercase;
+    transition: transform .25s, background .25s;
+    border: 1px solid var(--line);
+}
+.door-cta::after {
+    content: '→';
+    background: var(--sun-4); color: var(--ink-deep);
+    width: 32px; height: 32px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 15px;
+}
+.door-cta:hover { transform: scale(1.04); }
+
+/* Marquee at the bottom: GAMIF ( ) BOXES */
+.door-marquee {
+    position: absolute;
+    bottom: -2vw;
+    left: 0; right: 0;
+    z-index: 4;
+    text-align: center;
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 400;
+    font-size: clamp(70px, 13vw, 200px);
+    line-height: .9;
+    letter-spacing: -.025em;
+    color: var(--sun-3);
+    white-space: nowrap;
+    opacity: var(--door-marq-op, 0);
+    transition: opacity .5s ease;
+    pointer-events: none;
+}
+.door-marquee em {
+    font-style: italic;
+    font-weight: 300;
+    color: var(--sun-4);
+}
+.door-marquee .par {
+    color: var(--ink-deep);
+    font-style: normal;
+    margin: 0 .15em;
+    font-size: .82em;
+    vertical-align: 0.05em;
+}
+
+/* ════════════════════════════════════════════════════ */
+
+section.section { padding: 160px 48px; position: relative; }
+.wrap { max-width: 1200px; margin: 0 auto; }
+.label-row { display: flex; align-items: center; gap: 18px; margin-bottom: 48px; }
+.label-line { width: 32px; height: 1px; background: var(--sun-4); }
+.label-text {
+    font-size: 10px; letter-spacing: .3em;
+    text-transform: uppercase; color: var(--sun-5);
+}
+
+#concept { background: var(--cream); }
+#concept .casa-h {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300;
+    font-size: clamp(40px, 6vw, 86px);
+    line-height: 1.05; letter-spacing: -.015em;
+    max-width: 900px; margin-bottom: 64px;
+}
+#concept .casa-h em { font-style: italic; color: var(--burg-mid); }
+.casa-cols { display: grid; grid-template-columns: 1.4fr 1fr; gap: 80px; align-items: start; }
+.casa-cols .text { font-size: 16px; line-height: 1.9; color: var(--ink-soft); }
+.casa-cols .text p + p { margin-top: 22px; }
+.casa-quote {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic; font-weight: 400;
+    font-size: 26px; line-height: 1.5;
+    color: var(--burg-mid);
+    border-left: 2px solid var(--sun-4);
+    padding-left: 28px;
+}
+
+/* COLLECTION */
+#collection { background: var(--cream-warm); padding: 160px 48px; }
+.coll-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 80px; }
+.coll-h { font-family: 'Cormorant Garamond', serif; font-weight: 300; font-size: clamp(40px, 6vw, 84px); line-height: 1.05; }
+.coll-h em { font-style: italic; }
+.coll-sub { font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: var(--muted); }
+.coll-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+.coll-card {
+    aspect-ratio: 3/4;
+    background: var(--cream-deep);
+    position: relative; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    cursor: none; border: 0; text-align: left;
+    color: var(--ink);
+    font-family: 'Raleway', sans-serif;
+    transition: background .55s ease;
+    text-decoration: none;
+}
+.coll-card::before {
+    content: ''; position: absolute;
+    inset: 12% 22% 40% 22%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 32%, var(--sun-2), var(--sun-4) 55%, var(--sun-5) 90%);
+    box-shadow: 0 30px 60px rgba(180, 80, 20, .35), inset -16px -22px 50px rgba(80,30,5,.4);
+    transition: transform .55s cubic-bezier(.25,.46,.45,.94);
+}
+.coll-card:nth-child(2)::before { background: radial-gradient(circle at 35% 32%, #F3D3B0, var(--burg-mid) 55%, var(--burg-deep) 95%); }
+.coll-card:nth-child(3)::before {
+    background: radial-gradient(circle at 35% 32%, #FFF1D9, #F0E0C6 55%, #C9B68A 95%);
+    box-shadow: 0 30px 60px rgba(150, 120, 70, .25), inset -16px -22px 50px rgba(100,80,40,.3);
+}
+.coll-card:hover { background: var(--ink-deep); }
+.coll-card:hover::before { transform: translateY(-12px) scale(1.06); }
+
+.coll-info { position: absolute; bottom: 32px; left: 30px; right: 30px; }
+.coll-name { font-family: 'Cormorant Garamond', serif; font-size: 30px; letter-spacing: .04em; transition: color .55s; }
+.coll-meta { font-size: 10px; letter-spacing: .22em; text-transform: uppercase; color: var(--muted); margin-top: 6px; transition: color .55s; }
+.coll-desc { font-size: 12px; line-height: 1.55; color: var(--ink-soft); margin-top: 12px; max-width: 240px; transition: color .55s; }
+.coll-card:hover .coll-name { color: var(--cream-warm); }
+.coll-card:hover .coll-meta { color: var(--sun-3); }
+.coll-card:hover .coll-desc { color: rgba(248,239,217,.7); }
+
+/* ════════════════════════════════════════════════════ */
+/*  BUILD TEASER  (replaces the interactive builder)     */
+/* ════════════════════════════════════════════════════ */
+#build { background: var(--cream); }
+.teaser-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 100px;
+    align-items: start;
+    margin-top: 32px;
+}
+.teaser-h {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300;
+    font-size: clamp(40px, 6vw, 86px);
+    line-height: 1.05; letter-spacing: -.015em;
+    margin-bottom: 36px;
+}
+.teaser-h em { font-style: italic; color: var(--burg-mid); }
+.teaser-body { font-size: 15px; line-height: 1.9; color: var(--ink-soft); margin-bottom: 36px; max-width: 460px; }
+.teaser-cta {
+    display: inline-flex; align-items: center; gap: 14px;
+    background: var(--ink-deep); color: var(--cream-warm);
+    padding: 18px 36px; text-decoration: none;
+    font-family: 'Raleway', sans-serif;
+    font-size: 11px; letter-spacing: .22em;
+    text-transform: uppercase;
+    transition: background .25s, transform .25s;
+}
+.teaser-cta::after {
+    content: '→';
+    font-size: 13px; line-height: 1;
+}
+.teaser-cta:hover { background: var(--burg-mid); transform: translateX(4px); }
+.teaser-note { margin-top: 16px; font-size: 11px; letter-spacing: .14em; color: var(--muted); font-style: italic; }
+
+.teaser-steps { list-style: none; padding: 0; }
+.teaser-steps li {
+    padding: 26px 0;
+    border-bottom: 1px solid var(--line);
+    display: grid;
+    grid-template-columns: 64px 1fr;
+    gap: 28px;
+    align-items: start;
+}
+.teaser-steps li:last-child { border-bottom: 0; }
+.teaser-steps .s-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-size: 18px;
+    color: var(--sun-5);
+    letter-spacing: .15em;
+    padding-top: 4px;
+}
+.teaser-steps .s-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 500;
+    font-size: 24px;
+    color: var(--ink);
+    margin-bottom: 6px;
+}
+.teaser-steps .s-text { font-size: 14px; line-height: 1.7; color: var(--ink-soft); }
+
+/* STORY */
+#story { background: var(--burg-deep); color: var(--cream-warm); padding: 200px 48px; }
+#story .label-text { color: var(--sun-3); }
+#story .label-line { background: var(--sun-3); }
+.story-quote {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic; font-weight: 300;
+    font-size: clamp(34px, 5vw, 70px);
+    line-height: 1.25; letter-spacing: -.01em;
+    max-width: 900px; margin-bottom: 90px;
+}
+.story-quote span { color: var(--sun-3); }
+.story-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 80px; padding-top: 56px; border-top: 1px solid rgba(248,239,217,0.12); }
+.founder-name { font-family: 'Cormorant Garamond', serif; font-weight: 500; font-size: 22px; letter-spacing: .05em; }
+.founder-role { font-size: 10px; letter-spacing: .25em; text-transform: uppercase; color: var(--sun-3); margin-top: 8px; }
+.story-text { font-size: 15px; line-height: 1.95; color: rgba(248,239,217,0.65); }
+.story-text p + p { margin-top: 22px; }
+
+/* CONTACT */
+#contact { background: var(--cream-deep); padding: 140px 48px; text-align: center; }
+#contact .ct-eyebrow { font-size: 10px; letter-spacing: .3em; text-transform: uppercase; color: var(--sun-5); margin-bottom: 24px; }
+#contact .ct-h {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300;
+    font-size: clamp(40px, 5.5vw, 72px);
+    line-height: 1.1; letter-spacing: -.01em;
+    color: var(--ink-deep);
+    max-width: 800px; margin: 0 auto 48px;
+}
+#contact .ct-h em { font-style: italic; color: var(--burg-mid); }
+.ct-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; max-width: 880px; margin: 0 auto; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.ct-cell { padding: 36px 24px; border-right: 1px solid var(--line); }
+.ct-cell:last-child { border-right: 0; }
+.ct-cell .ct-label { font-size: 9px; letter-spacing: .28em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+.ct-cell a { font-family: 'Cormorant Garamond', serif; font-size: 18px; color: var(--ink); text-decoration: none; transition: color .25s; }
+.ct-cell a:hover { color: var(--sun-5); }
+
+/* FOOTER */
+footer { background: var(--burg-deep); color: var(--cream-warm); padding: 56px 48px; border-top: 1px solid rgba(248,239,217,0.08); display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 40px; }
+.foot-logo { font-family: 'Cormorant Garamond', serif; font-weight: 500; font-size: 18px; letter-spacing: .24em; display: flex; align-items: center; gap: 12px; }
+.foot-logo::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--sun-4); }
+.foot-nav { display: flex; gap: 32px; }
+.foot-nav a { font-size: 10px; letter-spacing: .22em; text-transform: uppercase; color: rgba(248,239,217,0.5); text-decoration: none; transition: color .3s; }
+.foot-nav a:hover, .foot-nav a.active { color: var(--sun-3); }
+.foot-copy { text-align: right; font-size: 10px; letter-spacing: .12em; color: rgba(248,239,217,0.35); line-height: 1.7; }
+
+/* REVEAL */
+.reveal { opacity: 0; transform: translateY(40px); transition: opacity 1s ease, transform 1s cubic-bezier(.2,.6,.2,1); }
+.reveal.in { opacity: 1; transform: translateY(0); }
+.d1 { transition-delay: .12s; }
+.d2 { transition-delay: .24s; }
+.d3 { transition-delay: .36s; }
+.d4 { transition-delay: .48s; }
+
+@media (max-width: 900px) {
+    nav, footer, section.section, #collection, .editorial-section, #contact { padding-left: 28px; padding-right: 28px; }
+    .nav-links, .nav-cta { display: none; }
+    .hamburger { display: block; }
+    .casa-cols, .story-grid, .teaser-grid { grid-template-columns: 1fr; gap: 40px; }
+    .coll-grid, .ct-grid { grid-template-columns: 1fr; }
+    .ct-cell { border-right: 0; border-bottom: 1px solid var(--line); }
+    .ct-cell:last-child { border-bottom: 0; }
+    .door-side { position: static; transform: none; max-width: none; margin: 40px 28px 0; }
+    footer { grid-template-columns: 1fr; text-align: center; gap: 24px; }
+    .foot-copy { text-align: center; }
+    .foot-nav { justify-content: center; flex-wrap: wrap; gap: 18px; }
+}
+</style>
+</head>
+<body>
+
+<div class="cursor-dot" id="cursorDot"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<div class="preloader" id="preloader">
+    <div class="pre-orb"></div>
+    <div class="pre-text">GAMIF <em>·</em> TBILISI</div>
+    <div class="pre-progress"></div>
+</div>
+
+<nav id="nav">
+    <a href="#intro" class="nav-logo" data-nav="intro">Gamif</a>
+    <div class="nav-links">
+        <a href="#concept" data-nav="concept">Concept</a>
+        <a href="build.html">Build a Box</a>
+        <a href="#collection" data-nav="collection">Boxes</a>
+        <a href="#story" data-nav="story">Story</a>
+        <a href="build.html" class="nav-cta">Start Building</a>
+    </div>
+    <button class="hamburger" id="hamburger" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+    </button>
+</nav>
+
+<div class="mobile-menu" id="mobileMenu">
+    <a href="#concept" data-nav="concept">Concept</a>
+    <a href="build.html">Build a Box</a>
+    <a href="#collection" data-nav="collection">Boxes</a>
+    <a href="#story" data-nav="story">Story</a>
+    <a href="#contact" data-nav="contact">Contact</a>
+    <a href="build.html" class="mm-cta">Start Building</a>
+</div>
+
+<div class="progress-rail" id="progressRail"></div>
+
+<!-- HERO -->
+<section class="hero-scroll" id="intro">
+    <div class="hero-sticky" id="heroSticky">
+        <div class="backdrop-glow" id="backdropGlow"></div>
+        <div class="orb-wrap" id="orbWrap"><div class="orb"></div></div>
+        <div class="scene scene-1" id="scene1"><div class="casa-label">GAMIF <em>·</em> MYSTERY BOX</div></div>
+        <div class="scene scene-2" id="scene2"><div class="scroll-discover"><span>Scroll to reveal</span><div class="dot"></div></div></div>
+        <div class="scene scene-3" id="scene3">
+            <div class="wordmark">Gamif</div>
+            <div class="caption">Build a box. Spin the wheel. Unbox the unknown.</div>
+        </div>
+        <div class="scene scene-4" id="scene4">
+            <h2 class="editorial">OPEN<br>THE <em>thrill</em><br>OF UNKNOWN<span class="star">*</span></h2>
+            <div class="editorial-sub">* &nbsp;Every box hides a surprise worth filming</div>
+        </div>
+        <div class="tagline-corner">
+            <div class="mini-orb"></div>
+            <span>A cinematic mystery-box platform from <em>Tbilisi</em>.</span>
+        </div>
+    </div>
+</section>
+
+<!-- EDITORIAL HEADLINE -->
+<section class="editorial-section">
+    <p class="ed-eyebrow reveal">A study in surprise</p>
+    <h2 class="ed-title reveal d1">FOR <em>the</em><br>CURIOUS<br>HEART<span class="star">✦</span></h2>
+</section>
+
+<!-- ────────────────────────────────────────────────────────── -->
+<!--  ARCH / DOOR SCROLL REVEAL                                   -->
+<!-- ────────────────────────────────────────────────────────── -->
+<section class="door-scroll" id="doorScroll">
+    <div class="door-sticky">
+
+        <div class="door-sky" id="doorSky"></div>
+
+        <div class="door-arch-wrap">
+            <div class="door-arch" id="doorArch">
+                <div class="door-scene-text">an interior glimpse</div>
+                <div class="door-scene-orb"></div>
+                <div class="door-scene-spark" style="--x:18%; --y:32%; --o:.7"></div>
+                <div class="door-scene-spark" style="--x:82%; --y:28%; --o:.6"></div>
+                <div class="door-scene-spark" style="--x:24%; --y:74%; --o:.8"></div>
+                <div class="door-scene-spark" style="--x:78%; --y:78%; --o:.5"></div>
+                <div class="door-scene-spark" style="--x:50%; --y:88%; --o:.7"></div>
+            </div>
+        </div>
+
+        <div class="door-side" id="doorSide">
+            <div class="door-side-eyebrow">Inside every box</div>
+            <p class="door-side-body">
+                A curated trio of picks, sealed in our Tbilisi atelier and revealed
+                at unboxing &mdash; with <em>a wheel-given surprise</em> tucked inside.
+            </p>
+            <a href="build.html" class="door-cta">Browse the boxes</a>
+        </div>
+
+        <div class="door-marquee" id="doorMarquee">
+            GAMIF <span class="par">(</span> <em>boxes</em> <span class="par">)</span> AWAIT
+        </div>
+
+    </div>
+</section>
+
+<!-- CONCEPT -->
+<section id="concept" class="section">
+    <div class="wrap">
+        <div class="label-row reveal">
+            <div class="label-line"></div>
+            <span class="label-text">The Concept</span>
+        </div>
+        <h2 class="casa-h reveal d1">A new ritual for<br>the <em>joy of guessing</em></h2>
+        <div class="casa-cols">
+            <div class="text reveal d2">
+                <p>Gamif turns shopping into a film you star in. Pick three items —
+                a main surprise, a sweet companion, a small token — pay a box price
+                that's always lower than retail, and let the wheel decide the rest.</p>
+                <p>Behind every order is a server-side spin that may grant free
+                delivery, a steeper discount, a bonus gift, an upgrade, or a
+                mystery item drawn from this season's stock. The moment of the
+                unboxing belongs to you. The story you tell with it is ours together.</p>
+            </div>
+            <div class="reveal d3">
+                <blockquote class="casa-quote">
+                    "Three picks, one spin, one box — and a feeling that doesn't fit
+                    on a receipt."
+                </blockquote>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- COLLECTION -->
+<section id="collection">
+    <div class="wrap">
+        <div class="coll-head">
+            <h2 class="coll-h reveal"><em>Three</em><br>Box Tiers</h2>
+            <p class="coll-sub reveal d2">Pick your level of surprise</p>
+        </div>
+        <div class="coll-grid">
+            <a class="coll-card reveal" href="build.html?tier=sorpresa" aria-label="Build a Sorpresa box">
+                <div class="coll-info">
+                    <div class="coll-name">Sorpresa</div>
+                    <div class="coll-meta">from 49 ₾ &nbsp;·&nbsp; Entry</div>
+                    <p class="coll-desc">3 curated picks · retail value 70–95 ₾ · spin bonus included</p>
+                </div>
+            </a>
+            <a class="coll-card reveal d1" href="build.html?tier=premiata" aria-label="Build a Premiata box">
+                <div class="coll-info">
+                    <div class="coll-name">Premiata</div>
+                    <div class="coll-meta">from 99 ₾ &nbsp;·&nbsp; Signature</div>
+                    <p class="coll-desc">3 elevated picks · retail value 140–180 ₾ · upgraded spin pool</p>
+                </div>
+            </a>
+            <a class="coll-card reveal d2" href="build.html?tier=leggenda" aria-label="Build a Leggenda box">
+                <div class="coll-info">
+                    <div class="coll-name">Leggenda</div>
+                    <div class="coll-meta">from 199 ₾ &nbsp;·&nbsp; Legendary</div>
+                    <p class="coll-desc">3 premium picks · retail value 280–340 ₾ · guaranteed bonus item</p>
+                </div>
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- BUILD TEASER (replaces the interactive builder) -->
+<section id="build" class="section">
+    <div class="wrap">
+        <div class="label-row reveal">
+            <div class="label-line"></div>
+            <span class="label-text">Build · Spin · Unbox</span>
+        </div>
+        <div class="teaser-grid">
+            <div class="reveal d1">
+                <h2 class="teaser-h">Three picks.<br>One <em>spin</em>.<br>One <em>filmable</em> box.</h2>
+                <p class="teaser-body">
+                    Pick a Main, a Sweet, and a Bonus from our curated catalogue.
+                    The box price is always lower than retail. Our server-side wheel
+                    then layers on a surprise — free delivery, an extra discount,
+                    a curator's bonus, an upgrade, or a hidden item — and the parcel
+                    is sealed in our Tbilisi atelier for unboxing.
+                </p>
+                <a href="build.html" class="teaser-cta">Start Building</a>
+                <p class="teaser-note">Opens our live box builder · payments in ₾</p>
+            </div>
+            <ol class="teaser-steps reveal d2">
+                <li>
+                    <div class="s-num">01</div>
+                    <div>
+                        <div class="s-name">Pick three items</div>
+                        <div class="s-text">Choose one from each slot — Main, Sweet, Bonus — across our seasonally rotating catalogue.</div>
+                    </div>
+                </li>
+                <li>
+                    <div class="s-num">02</div>
+                    <div>
+                        <div class="s-name">Spin the lucky wheel</div>
+                        <div class="s-text">A server-validated spin decides your extra perk: free delivery, +10%, bonus item, upgrade, or mystery pick.</div>
+                    </div>
+                </li>
+                <li>
+                    <div class="s-num">03</div>
+                    <div>
+                        <div class="s-name">Unbox the surprise</div>
+                        <div class="s-text">Your box ships next day in Tbilisi. Open it on camera. Tag us. Show the feed what arrived.</div>
+                    </div>
+                </li>
+            </ol>
+        </div>
+    </div>
+</section>
+
+<!-- STORY -->
+<section id="story">
+    <div class="wrap">
+        <div class="label-row reveal">
+            <div class="label-line"></div>
+            <span class="label-text">The Story</span>
+        </div>
+        <blockquote class="story-quote reveal d1">
+            "We built Gamif because shopping should feel like
+            <span>the first scene of a film</span> — three picks, a spin of fate,
+            and a moment worth filming."
+        </blockquote>
+        <div class="story-grid reveal d2">
+            <div>
+                <div class="founder-name">Gamif Studio</div>
+                <div class="founder-role">Tbilisi &nbsp;·&nbsp; Established 2024</div>
+            </div>
+            <div class="story-text">
+                <p>Gamif is a mystery-box e-commerce platform built for the Georgian
+                market and the global feed. Every order begins with three picks
+                across our curated catalogue, completes with a server-validated
+                lucky-wheel spin, and ends in an unboxing moment crafted to be shared.</p>
+                <p>Behind the scenes, products sync nightly from our backoffice,
+                stock is reconciled live, and every box price is verified to beat
+                retail before checkout. Payments clear through Stripe in Georgian lari.
+                What you see is what arrives — plus, almost always, something extra.</p>
+                <p>This is not a catalogue. It is a ritual. And it begins the moment
+                you press play.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CONTACT -->
+<section id="contact">
+    <p class="ct-eyebrow reveal">Get in touch</p>
+    <h2 class="ct-h reveal d1">Questions, partnerships,<br><em>or unboxing reels</em>?</h2>
+    <div class="ct-grid reveal d2">
+        <div class="ct-cell">
+            <div class="ct-label">Email</div>
+            <a href="mailto:hello@gamif.ge">hello@gamif.ge</a>
+        </div>
+        <div class="ct-cell">
+            <div class="ct-label">WhatsApp</div>
+            <a href="https://wa.me/995500000000" target="_blank" rel="noopener">+995 500 000 000</a>
+        </div>
+        <div class="ct-cell">
+            <div class="ct-label">Studio</div>
+            <a href="https://maps.app.goo.gl/" target="_blank" rel="noopener">Tbilisi · Vake</a>
+        </div>
+    </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+    <div class="foot-logo">Gamif</div>
+    <div class="foot-nav">
+        <a href="#concept" data-nav="concept">Concept</a>
+        <a href="build.html">Build a Box</a>
+        <a href="#collection" data-nav="collection">Boxes</a>
+        <a href="#story" data-nav="story">Story</a>
+        <a href="#contact" data-nav="contact">Contact</a>
+    </div>
+    <div class="foot-copy">
+        © 2024 Gamif &nbsp;·&nbsp; Tbilisi, Georgia<br>Stripe payments in ₾ &nbsp;·&nbsp; Built for the feed
+    </div>
+</footer>
+
+<script>
+// ──────────────── CURSOR ────────────────
+const dot  = document.getElementById('cursorDot');
+const ring = document.getElementById('cursorRing');
+let rx = 0, ry = 0, dx = 0, dy = 0;
+document.addEventListener('mousemove', e => {
+    dx = e.clientX; dy = e.clientY;
+    dot.style.left = dx + 'px'; dot.style.top = dy + 'px';
+});
+(function animRing() {
+    rx += (dx - rx) * 0.14;
+    ry += (dy - ry) * 0.14;
+    ring.style.left = rx + 'px';
+    ring.style.top  = ry + 'px';
+    requestAnimationFrame(animRing);
+})();
+document.querySelectorAll('a, button, .coll-card').forEach(el => {
+    el.addEventListener('mouseenter', () => {
+        dot.style.width  = '12px'; dot.style.height = '12px';
+        ring.style.width = '52px'; ring.style.height = '52px';
+        ring.style.opacity = '.25';
+    });
+    el.addEventListener('mouseleave', () => {
+        dot.style.width  = '6px'; dot.style.height = '6px';
+        ring.style.width = '34px'; ring.style.height = '34px';
+        ring.style.opacity = '.55';
+    });
+});
+
+// ──────────────── PRELOADER ────────────────
+const preloader = document.getElementById('preloader');
+const hasSeenIntro = sessionStorage.getItem('gamif_seen') === '1';
+if (hasSeenIntro) preloader.classList.add('fast');
+window.addEventListener('load', () => {
+    const delay = hasSeenIntro ? 400 : 1600;
+    setTimeout(() => {
+        preloader.classList.add('gone');
+        sessionStorage.setItem('gamif_seen', '1');
+    }, delay);
+});
+
+// ──────────────── HELPERS ────────────────
+const lerp = (a, b, t) => a + (b - a) * t;
+const clamp01 = v => Math.max(0, Math.min(1, v));
+const smooth = t => t * t * (3 - 2 * t);
+const range = (p, a, b, smoothed = true) => {
+    const t = clamp01((p - a) / (b - a));
+    return smoothed ? smooth(t) : t;
+};
+const mixColors = (a, b, t) => a.map((v, i) => Math.round(lerp(v, b[i], t)));
+
+// ──────────────── HERO ────────────────
+const heroScroll  = document.getElementById('intro');
+const heroSticky  = document.getElementById('heroSticky');
+const orbWrap     = document.getElementById('orbWrap');
+const backdrop    = document.getElementById('backdropGlow');
+const progressRail = document.getElementById('progressRail');
+const scene1 = document.getElementById('scene1');
+const scene2 = document.getElementById('scene2');
+const scene3 = document.getElementById('scene3');
+const scene4 = document.getElementById('scene4');
+const taglineCorner = document.querySelector('.tagline-corner');
+
+let lastHeroProgress = -1;
+function updateHero() {
+    const rect = heroScroll.getBoundingClientRect();
+    const total = heroScroll.offsetHeight - window.innerHeight;
+    const progress = clamp01(-rect.top / total);
+    if (Math.abs(progress - lastHeroProgress) < 0.0005) return;
+    lastHeroProgress = progress;
+
+    let scale, x, y;
+    if (progress < 0.12) {
+        scale = lerp(0.18, 1.0, range(progress, 0, 0.12)); x = 0; y = 0;
+    } else if (progress < 0.40) {
+        scale = 1.0; x = 0; y = 0;
+    } else if (progress < 0.65) {
+        const t = range(progress, 0.40, 0.65);
+        scale = lerp(1.0, 0.55, t);
+        x = lerp(0, 60, t); y = lerp(0, 40, t);
+    } else {
+        const t = range(progress, 0.65, 1.0);
+        scale = lerp(0.55, 0.28, t);
+        x = lerp(60, 0, t); y = lerp(40, -120, t);
+    }
+    orbWrap.style.setProperty('--orb-scale', scale);
+    orbWrap.style.setProperty('--orb-x', x + 'px');
+    orbWrap.style.setProperty('--orb-y', y + 'px');
+
+    const s1Op = clamp01(1 - range(progress, 0.06, 0.13));
+    const s2Op = clamp01(range(progress, 0.12, 0.18) * (1 - range(progress, 0.34, 0.42)));
+    const s3Op = clamp01(range(progress, 0.42, 0.50) * (1 - range(progress, 0.62, 0.70)));
+    const s4Op = clamp01(range(progress, 0.70, 0.80));
+    scene1.style.opacity = s1Op;
+    scene2.style.opacity = s2Op;
+    scene3.style.opacity = s3Op;
+    scene4.style.opacity = s4Op;
+    taglineCorner.style.opacity = (s2Op + s3Op) * 0.6 * (1 - s4Op);
+
+    let bgColor;
+    if (progress < 0.10) {
+        bgColor = mixColors([241,231,214], [46,20,16], range(progress, 0, 0.10));
+    } else if (progress < 0.65) {
+        bgColor = [46, 20, 16];
+    } else {
+        bgColor = mixColors([46,20,16], [74, 31, 26], range(progress, 0.65, 0.90));
+    }
+    heroSticky.style.backgroundColor = `rgb(${bgColor.join(',')})`;
+    backdrop.style.opacity = clamp01(0.4 + scale * 0.9);
+    progressRail.style.setProperty('--prog', (progress * 100) + '%');
+    progressRail.classList.toggle('visible', progress > 0.08 && progress < 0.95);
+}
+
+// ──────────────── DOOR / ARCH ────────────────
+const doorScroll = document.getElementById('doorScroll');
+const doorArch   = document.getElementById('doorArch');
+const doorSky    = document.getElementById('doorSky');
+const doorSide   = document.getElementById('doorSide');
+const doorMarq   = document.getElementById('doorMarquee');
+
+let lastDoorProgress = -1;
+function updateDoor() {
+    const rect = doorScroll.getBoundingClientRect();
+    const total = doorScroll.offsetHeight - window.innerHeight;
+    const progress = clamp01(-rect.top / total);
+    if (Math.abs(progress - lastDoorProgress) < 0.0005) return;
+    lastDoorProgress = progress;
+
+    // Arch grows from 0 to a comfortable peak (~62vh tall, 50vh wide)
+    // most of the growth happens in the first 60% of scroll
+    const growT = smooth(clamp01(progress / 0.6));
+    const archH = lerp(0, Math.min(window.innerHeight * 0.7, 620), growT);
+    const archW = archH * 0.78;  // 5:6.4 aspect — proper arch proportions
+    doorArch.style.setProperty('--arch-w', archW + 'px');
+    doorArch.style.setProperty('--arch-h', archH + 'px');
+
+    // Sky band retracts as the arch grows
+    // start: 100% (full yellow at top), end: 18% (just a strip)
+    const skyH = lerp(100, 18, growT);
+    doorSky.style.setProperty('--sky-height', skyH + '%');
+    // Sky curve hugging the arch top
+    doorSky.style.setProperty('--arch-w', archW + 'px');
+
+    // Side text fades in 0.45 → 0.7
+    doorSide.style.setProperty('--door-side-op', clamp01(range(progress, 0.45, 0.68)));
+    // Marquee fades in 0.6 → 0.85
+    doorMarq.style.setProperty('--door-marq-op', clamp01(range(progress, 0.60, 0.85)));
+}
+
+function onScroll() { updateHero(); updateDoor(); }
+window.addEventListener('scroll', onScroll, { passive: true });
+window.addEventListener('resize', onScroll);
+onScroll();
+
+// ──────────────── ANCHOR NAV ────────────────
+function smoothScrollTo(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const top = id === 'intro' ? 0 : el.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo({ top, behavior: 'smooth' });
+}
+document.querySelectorAll('[data-nav]').forEach(link => {
+    link.addEventListener('click', e => {
+        const id = link.dataset.nav;
+        if (!document.getElementById(id)) return;
+        e.preventDefault();
+        closeMobileMenu();
+        smoothScrollTo(id);
+    });
+});
+
+// ──────────────── ACTIVE NAV ────────────────
+const sectionIds = ['intro', 'concept', 'collection', 'build', 'story', 'contact'];
+const navLinks = document.querySelectorAll('[data-nav]');
+function setActiveNav(id) {
+    navLinks.forEach(a => a.classList.toggle('active', a.dataset.nav === id));
+}
+const navObserver = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting && e.intersectionRatio > 0.35) setActiveNav(e.target.id); });
+}, { threshold: [0.35, 0.6] });
+sectionIds.forEach(id => { const el = document.getElementById(id); if (el) navObserver.observe(el); });
+
+// ──────────────── MOBILE MENU ────────────────
+const hamburger = document.getElementById('hamburger');
+const mobileMenu = document.getElementById('mobileMenu');
+function closeMobileMenu() {
+    hamburger.classList.remove('open');
+    mobileMenu.classList.remove('open');
+    document.body.classList.remove('modal-open');
+}
+hamburger.addEventListener('click', () => {
+    const open = mobileMenu.classList.toggle('open');
+    hamburger.classList.toggle('open', open);
+    document.body.classList.toggle('modal-open', open);
+});
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && mobileMenu.classList.contains('open')) closeMobileMenu();
+});
+
+// ──────────────── SCROLL REVEAL ────────────────
+const io = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+    });
+}, { threshold: 0.12, rootMargin: '0px 0px -60px 0px' });
+document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+</script>
+
+</body>
+</html>

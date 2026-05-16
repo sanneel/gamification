@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<!--
+  Gamif — Box Builder page (separate URL from homepage).
+  In the React/Vite app this maps to pages/build.tsx or app/build/page.tsx.
+
+  Backend contract:
+    GET  /api/products?slot=main|sweet|bonus[&tier=sorpresa|premiata|leggenda]
+      → array of products: { id, name, retail, icon, tier }
+    POST /api/spin   { orderToken, slots:{main,sweet,bonus} }
+      → { outcome, label, savings?, bonusProduct? }
+    POST /api/checkout-intent  { slots, tier, spinResult }
+      → { clientSecret } for Stripe Payment Intent (GEL)
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Build a Box — Gamif</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500&family=Raleway:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+    --cream: #F1E7D6; --cream-deep: #E6D8C0; --cream-warm: #F8EFD9;
+    --ink: #3A2820; --ink-soft: #5A4030; --ink-deep: #2B1B14;
+    --sun-1: #FFE9B8; --sun-2: #FBC97A; --sun-3: #F4B860;
+    --sun-4: #E89945; --sun-5: #C26F22; --sun-6: #884812;
+    --burg: #4A1F1A; --burg-deep: #2E1410; --burg-mid: #6B2A22;
+    --muted: rgba(58, 40, 32, 0.5);
+    --line: rgba(58, 40, 32, 0.14);
+}
+
+html { scroll-behavior: smooth; }
+body {
+    background: var(--cream);
+    color: var(--ink);
+    font-family: 'Raleway', sans-serif;
+    font-weight: 300;
+    line-height: 1.5;
+    overflow-x: hidden;
+    cursor: none;
+}
+body.modal-open { overflow: hidden; }
+::selection { background: var(--sun-4); color: var(--ink-deep); }
+
+body::after {
+    content: ''; position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.6'/></svg>");
+    opacity: 0.05; pointer-events: none; z-index: 9990;
+}
+
+.cursor-dot {
+    width: 6px; height: 6px;
+    background: var(--sun-4); border-radius: 50%;
+    position: fixed; pointer-events: none;
+    z-index: 10001; transform: translate(-50%, -50%);
+    transition: width .18s, height .18s, background .25s;
+}
+.cursor-ring {
+    width: 34px; height: 34px;
+    border: 1px solid var(--sun-4); border-radius: 50%;
+    position: fixed; pointer-events: none;
+    z-index: 10000; transform: translate(-50%, -50%);
+    transition: width .35s cubic-bezier(.25,.46,.45,.94), height .35s, opacity .3s;
+    opacity: .55;
+}
+::-webkit-scrollbar { width: 2px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--sun-4); }
+
+/* NAV */
+nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 24px 48px;
+    background: rgba(241,231,214,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line);
+}
+.nav-logo {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 500; font-size: 17px;
+    letter-spacing: .22em; text-decoration: none;
+    display: flex; align-items: center; gap: 12px;
+    color: var(--ink);
+}
+.nav-logo::before {
+    content: ''; width: 10px; height: 10px;
+    border-radius: 50%; background: var(--sun-4);
+}
+.nav-back {
+    display: inline-flex; align-items: center; gap: 12px;
+    font-size: 10px; letter-spacing: .22em;
+    text-transform: uppercase; text-decoration: none;
+    color: var(--ink); opacity: .7;
+    transition: opacity .25s;
+}
+.nav-back::before { content: '←'; font-size: 14px; }
+.nav-back:hover { opacity: 1; }
+
+/* PAGE HEADER */
+.builder-head {
+    padding: 160px 48px 80px;
+    text-align: center;
+    background: var(--cream);
+}
+.builder-eyebrow {
+    font-size: 10px; letter-spacing: .32em;
+    text-transform: uppercase; color: var(--sun-5);
+    margin-bottom: 18px;
+}
+.builder-h {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300;
+    font-size: clamp(50px, 8vw, 110px);
+    line-height: 1; letter-spacing: -.02em;
+    color: var(--ink-deep);
+    margin-bottom: 22px;
+}
+.builder-h em { font-style: italic; color: var(--burg-mid); }
+.builder-sub {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic; font-size: 22px;
+    color: var(--ink-soft);
+    max-width: 600px; margin: 0 auto;
+}
+
+/* TIER PILL */
+.tier-pill-wrap { text-align: center; margin-top: 32px; }
+.build-tier-pill {
+    display: inline-flex; align-items: center; gap: 12px;
+    padding: 8px 18px 8px 22px;
+    border: 1px solid var(--sun-4);
+    border-radius: 100px;
+    font-size: 10px; letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--sun-5);
+    background: rgba(244,184,96,.08);
+    opacity: 0; transform: translateY(-4px);
+    transition: opacity .4s, transform .4s;
+}
+.build-tier-pill.visible { opacity: 1; transform: translateY(0); }
+.build-tier-pill button {
+    background: transparent; border: 0;
+    color: var(--sun-5); cursor: none;
+    font-size: 16px; line-height: 1; padding: 0; opacity: .7;
+}
+.build-tier-pill button:hover { opacity: 1; }
+
+/* BUILD GRID */
+.builder-section { padding: 60px 48px 100px; background: var(--cream); }
+.wrap { max-width: 1200px; margin: 0 auto; }
+.build-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 28px;
+}
+.slot {
+    background: var(--cream-warm);
+    border: 1px solid var(--line);
+    padding: 44px 32px 32px;
+    display: flex; flex-direction: column;
+    align-items: flex-start;
+    position: relative;
+    transition: transform .35s ease, border-color .35s, background .35s;
+    aspect-ratio: 3/4;
+}
+.slot:hover { transform: translateY(-4px); border-color: var(--sun-4); }
+.slot.filled { background: linear-gradient(180deg, var(--cream-warm), #F2E5C8); border-color: var(--sun-4); }
+.slot-orb {
+    width: 110px; height: 110px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 36% 30%,
+        var(--sun-1) 0%, var(--sun-3) 35%,
+        var(--sun-4) 65%, var(--sun-5) 95%);
+    box-shadow:
+        inset -10px -14px 28px rgba(60,25,5,.4),
+        inset 8px 10px 20px rgba(255,245,220,.3),
+        0 14px 30px rgba(220,140,60,.25);
+    margin: 0 auto 28px;
+    opacity: 0.4;
+    transition: opacity .4s, transform .4s;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 48px;
+}
+.slot:hover .slot-orb { opacity: 1; transform: scale(1.05); }
+.slot.filled .slot-orb { opacity: 1; }
+.slot-orb.loading {
+    background: linear-gradient(90deg, var(--cream-deep) 25%, var(--cream-warm) 50%, var(--cream-deep) 75%);
+    background-size: 200% 100%;
+    animation: skeleton 1.4s linear infinite;
+    box-shadow: none;
+}
+@keyframes skeleton { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.slot-no {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic; font-size: 13px;
+    letter-spacing: .15em; color: var(--sun-5);
+    margin-bottom: 8px;
+}
+.slot-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 400; font-size: 28px;
+    letter-spacing: .02em; margin-bottom: 10px;
+}
+.slot-meta {
+    font-size: 12px; line-height: 1.65;
+    color: var(--muted);
+    margin-bottom: auto; padding-bottom: 22px;
+}
+.slot-item-info { display: none; margin-bottom: 20px; padding-top: 4px; }
+.slot.filled .slot-meta { display: none; }
+.slot.filled .slot-item-info { display: block; }
+.slot-item-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 18px; font-weight: 500;
+    color: var(--ink); margin-bottom: 4px;
+}
+.slot-item-price {
+    font-size: 11px; letter-spacing: .15em;
+    color: var(--sun-5); text-transform: uppercase;
+}
+.slot-btn {
+    font-family: 'Raleway', sans-serif;
+    font-size: 10px; letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--ink);
+    padding: 12px 22px; cursor: none;
+    transition: background .25s, color .25s;
+}
+.slot-btn:hover { background: var(--ink); color: var(--cream-warm); }
+.slot-btn.change { border-color: var(--sun-5); color: var(--sun-5); }
+.slot-btn.change:hover { background: var(--sun-5); color: var(--cream-warm); }
+
+/* SUMMARY */
+.build-summary {
+    margin-top: 56px;
+    display: grid; grid-template-columns: 1fr auto;
+    gap: 60px; align-items: center;
+    padding-top: 40px;
+    border-top: 1px solid var(--line);
+}
+.summary-row {
+    display: flex; align-items: baseline;
+    gap: 20px; margin-bottom: 6px;
+}
+.summary-label {
+    font-size: 10px; letter-spacing: .25em;
+    text-transform: uppercase; color: var(--muted);
+    min-width: 130px;
+}
+.summary-strike {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px; color: var(--muted);
+}
+.summary-strike.has-value { text-decoration: line-through; }
+.summary-now {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 500; font-size: 44px;
+    color: var(--ink); letter-spacing: -.01em;
+}
+.summary-saving {
+    margin-top: 10px;
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic; font-size: 16px;
+    color: var(--burg-mid);
+    min-height: 22px;
+}
+.summary-saving.badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background: var(--sun-4); color: var(--ink-deep);
+    border-radius: 100px;
+    font-style: normal;
+    font-family: 'Raleway', sans-serif;
+    font-size: 10px;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+}
+.summary-right { display: flex; align-items: center; gap: 36px; }
+
+.wheel-preview {
+    width: 120px; height: 120px;
+    position: relative; flex-shrink: 0;
+    cursor: none;
+}
+.wheel-ring {
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    background: conic-gradient(from -30deg,
+        var(--sun-3) 0deg 60deg,
+        var(--burg-mid) 60deg 120deg,
+        var(--sun-4) 120deg 180deg,
+        var(--burg-deep) 180deg 240deg,
+        var(--sun-2) 240deg 300deg,
+        var(--burg-mid) 300deg 360deg);
+    box-shadow: 0 10px 28px rgba(60,25,5,.25), inset 0 0 0 4px var(--cream-warm);
+    animation: wheelSpin 14s linear infinite;
+}
+.wheel-ring.spinning { animation: wheelFastSpin 2.5s cubic-bezier(.2,.65,.3,1) forwards; }
+@keyframes wheelSpin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+@keyframes wheelFastSpin { from { transform: rotate(0); } to { transform: rotate(1440deg); } }
+.wheel-ring span {
+    position: absolute; top: 12%; left: 50%;
+    transform-origin: 0 320%;
+    transform: translateX(-50%) rotate(calc(var(--i) * 60deg + 30deg));
+    font-size: 7px; letter-spacing: .12em;
+    color: var(--cream-warm);
+    text-transform: uppercase; font-weight: 600;
+    white-space: nowrap;
+}
+.wheel-needle {
+    position: absolute; top: -6px; left: 50%;
+    transform: translateX(-50%);
+    width: 0; height: 0;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-top: 14px solid var(--ink);
+    z-index: 2;
+}
+
+.build-cta {
+    font-family: 'Raleway', sans-serif;
+    font-size: 11px; letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--cream-warm);
+    background: var(--ink);
+    padding: 18px 36px; text-decoration: none;
+    transition: background .25s, opacity .25s;
+    white-space: nowrap;
+    border: 0; cursor: none;
+}
+.build-cta:hover { background: var(--burg-mid); }
+.build-cta:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.spin-result {
+    margin-top: 36px;
+    padding: 28px 32px;
+    background: var(--cream-warm);
+    border-left: 3px solid var(--sun-4);
+    display: none; align-items: center; gap: 24px;
+    opacity: 0; transform: translateY(20px);
+    transition: opacity .6s ease, transform .6s ease;
+}
+.spin-result.shown { display: flex; opacity: 1; transform: translateY(0); }
+.spin-result-icon {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, var(--sun-1), var(--sun-3) 60%, var(--sun-5));
+    box-shadow: 0 8px 20px rgba(220,140,60,.35), inset -6px -8px 18px rgba(60,25,5,.3);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
+}
+.spin-result-body { flex: 1; }
+.spin-result-eyebrow {
+    font-size: 9px; letter-spacing: .3em;
+    text-transform: uppercase;
+    color: var(--sun-5); margin-bottom: 4px;
+}
+.spin-result-text {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 500; font-size: 26px;
+    color: var(--ink);
+}
+.spin-result-note {
+    font-size: 12px; color: var(--muted);
+    margin-top: 4px;
+}
+
+/* FOOTER */
+footer { background: var(--burg-deep); color: var(--cream-warm); padding: 56px 48px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 40px; }
+.foot-logo { font-family: 'Cormorant Garamond', serif; font-weight: 500; font-size: 18px; letter-spacing: .24em; display: flex; align-items: center; gap: 12px; }
+.foot-logo::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--sun-4); }
+.foot-nav { display: flex; gap: 32px; }
+.foot-nav a { font-size: 10px; letter-spacing: .22em; text-transform: uppercase; color: rgba(248,239,217,0.5); text-decoration: none; transition: color .3s; }
+.foot-nav a:hover { color: var(--sun-3); }
+.foot-copy { text-align: right; font-size: 10px; letter-spacing: .12em; color: rgba(248,239,217,0.35); line-height: 1.7; }
+
+/* MODALS */
+.modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(43,27,20,0.72);
+    backdrop-filter: blur(8px);
+    z-index: 10020;
+    opacity: 0; pointer-events: none;
+    transition: opacity .35s ease;
+    display: flex; align-items: center; justify-content: center;
+    padding: 32px;
+}
+.modal-backdrop.open { opacity: 1; pointer-events: auto; }
+.modal {
+    background: var(--cream); color: var(--ink);
+    max-width: 920px; width: 100%;
+    max-height: 86vh; overflow: auto;
+    transform: scale(.96) translateY(20px);
+    transition: transform .35s cubic-bezier(.2,.7,.3,1);
+    position: relative;
+}
+.modal-backdrop.open .modal { transform: scale(1) translateY(0); }
+.modal-head {
+    padding: 36px 44px 24px;
+    border-bottom: 1px solid var(--line);
+    display: flex; align-items: flex-end; justify-content: space-between;
+}
+.modal-eyebrow { font-size: 10px; letter-spacing: .3em; text-transform: uppercase; color: var(--sun-5); margin-bottom: 8px; }
+.modal-title { font-family: 'Cormorant Garamond', serif; font-weight: 400; font-size: 38px; letter-spacing: -.01em; }
+.modal-title em { font-style: italic; color: var(--burg-mid); }
+.modal-close {
+    background: transparent; border: 1px solid var(--line);
+    width: 38px; height: 38px; border-radius: 50%;
+    cursor: none; color: var(--ink);
+    font-size: 18px; line-height: 1;
+    transition: background .25s, color .25s, border-color .25s;
+}
+.modal-close:hover { background: var(--ink); color: var(--cream-warm); border-color: var(--ink); }
+
+.product-grid {
+    padding: 28px 44px 44px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+}
+.product-card {
+    background: var(--cream-warm);
+    border: 1px solid var(--line);
+    padding: 24px 18px;
+    text-align: center;
+    cursor: none;
+    transition: transform .25s ease, border-color .25s, background .25s;
+    display: flex; flex-direction: column; align-items: center;
+}
+.product-card:hover { transform: translateY(-3px); border-color: var(--sun-4); }
+.product-card.selected { background: var(--ink-deep); color: var(--cream-warm); border-color: var(--ink-deep); }
+.product-icon { font-size: 44px; margin-bottom: 14px; line-height: 1; }
+.product-name { font-family: 'Cormorant Garamond', serif; font-size: 18px; margin-bottom: 6px; }
+.product-price { font-size: 10px; letter-spacing: .15em; text-transform: uppercase; color: var(--sun-5); }
+.product-card.selected .product-price { color: var(--sun-3); }
+
+.checkout-body { padding: 28px 44px 44px; }
+.checkout-list { margin-bottom: 28px; }
+.checkout-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.checkout-row .ck-name { font-family: 'Cormorant Garamond', serif; font-size: 20px; }
+.checkout-row .ck-meta { font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); margin-top: 2px; }
+.checkout-row .ck-price { font-family: 'Cormorant Garamond', serif; font-size: 18px; }
+.checkout-totals { padding-top: 18px; }
+.ck-tot-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
+.ck-tot-row.final { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--ink); font-size: 16px; font-weight: 500; }
+.ck-tot-row.bonus { color: var(--sun-5); font-style: italic; }
+.checkout-cta {
+    margin-top: 28px; width: 100%;
+    font-family: 'Raleway', sans-serif;
+    font-size: 12px; letter-spacing: .25em;
+    text-transform: uppercase;
+    color: var(--cream-warm);
+    background: var(--ink-deep);
+    padding: 22px;
+    border: 0; cursor: none;
+    transition: background .25s;
+}
+.checkout-cta:hover { background: var(--burg-mid); }
+.checkout-note { margin-top: 14px; text-align: center; font-size: 11px; color: var(--muted); font-style: italic; }
+
+@media (max-width: 900px) {
+    nav, footer, .builder-head, .builder-section { padding-left: 28px; padding-right: 28px; }
+    .build-grid { grid-template-columns: 1fr; }
+    .build-summary { grid-template-columns: 1fr; gap: 30px; }
+    .summary-right { flex-direction: column; align-items: flex-start; gap: 20px; }
+    .product-grid { grid-template-columns: repeat(2, 1fr); padding: 24px; }
+    .modal-head { padding: 28px 24px 20px; }
+    .modal-title { font-size: 28px; }
+    footer { grid-template-columns: 1fr; text-align: center; gap: 24px; }
+    .foot-copy { text-align: center; }
+    .foot-nav { justify-content: center; flex-wrap: wrap; gap: 18px; }
+}
+</style>
+</head>
+<body>
+
+<div class="cursor-dot" id="cursorDot"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<nav>
+    <a href="index.html" class="nav-logo">Gamif</a>
+    <a href="index.html" class="nav-back">Back to home</a>
+</nav>
+
+<header class="builder-head">
+    <p class="builder-eyebrow">Build · Spin · Unbox</p>
+    <h1 class="builder-h">Build your <em>Gamif</em> box</h1>
+    <p class="builder-sub">Pick three items. Spin the wheel. Seal the surprise.</p>
+    <div class="tier-pill-wrap">
+        <div class="build-tier-pill" id="tierPill">
+            <span id="tierPillText">Building: Sorpresa</span>
+            <button id="tierPillClear" aria-label="Clear tier">×</button>
+        </div>
+    </div>
+</header>
+
+<section class="builder-section">
+    <div class="wrap">
+        <div class="build-grid">
+            <div class="slot" data-slot="main">
+                <div class="slot-orb" id="orb-main">✦</div>
+                <div class="slot-no">01</div>
+                <div class="slot-name">Main Pick</div>
+                <div class="slot-meta">A featured product — the star of your box</div>
+                <div class="slot-item-info" id="info-main">
+                    <div class="slot-item-name"></div>
+                    <div class="slot-item-price"></div>
+                </div>
+                <button class="slot-btn" data-pick="main">＋ Choose item</button>
+            </div>
+            <div class="slot" data-slot="sweet">
+                <div class="slot-orb" id="orb-sweet">♢</div>
+                <div class="slot-no">02</div>
+                <div class="slot-name">Sweet Pick</div>
+                <div class="slot-meta">A complementary gift to round it out</div>
+                <div class="slot-item-info" id="info-sweet">
+                    <div class="slot-item-name"></div>
+                    <div class="slot-item-price"></div>
+                </div>
+                <button class="slot-btn" data-pick="sweet">＋ Choose item</button>
+            </div>
+            <div class="slot" data-slot="bonus">
+                <div class="slot-orb" id="orb-bonus">○</div>
+                <div class="slot-no">03</div>
+                <div class="slot-name">Bonus Token</div>
+                <div class="slot-meta">A small surprise to finish the curation</div>
+                <div class="slot-item-info" id="info-bonus">
+                    <div class="slot-item-name"></div>
+                    <div class="slot-item-price"></div>
+                </div>
+                <button class="slot-btn" data-pick="bonus">＋ Choose item</button>
+            </div>
+        </div>
+
+        <div class="build-summary">
+            <div>
+                <div class="summary-row">
+                    <span class="summary-label">Retail total</span>
+                    <span class="summary-strike" id="retailTotal">— ₾</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Your box price</span>
+                    <span class="summary-now" id="boxTotal">— ₾</span>
+                </div>
+                <div class="summary-saving" id="savingsBadge">Select items above to see your savings</div>
+            </div>
+            <div class="summary-right">
+                <div class="wheel-preview" id="wheelPreview" aria-label="Lucky wheel">
+                    <div class="wheel-ring" id="wheelRing">
+                        <span style="--i:0">FREE&nbsp;SHIP</span>
+                        <span style="--i:1">-10%</span>
+                        <span style="--i:2">BONUS</span>
+                        <span style="--i:3">UPGRADE</span>
+                        <span style="--i:4">MYSTERY</span>
+                        <span style="--i:5">TRY&nbsp;AGAIN</span>
+                    </div>
+                    <div class="wheel-needle"></div>
+                </div>
+                <button class="build-cta" id="spinBuildCta" disabled>Spin &amp; Build →</button>
+            </div>
+        </div>
+
+        <div class="spin-result" id="spinResult" role="status" aria-live="polite">
+            <div class="spin-result-icon" id="spinIcon">✦</div>
+            <div class="spin-result-body">
+                <div class="spin-result-eyebrow">Lucky Wheel Result</div>
+                <div class="spin-result-text" id="spinText"></div>
+                <div class="spin-result-note" id="spinNote"></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<footer>
+    <div class="foot-logo">Gamif</div>
+    <div class="foot-nav">
+        <a href="index.html#concept">Concept</a>
+        <a href="index.html#collection">Boxes</a>
+        <a href="index.html#story">Story</a>
+        <a href="index.html#contact">Contact</a>
+    </div>
+    <div class="foot-copy">
+        © 2024 Gamif &nbsp;·&nbsp; Tbilisi, Georgia<br>Stripe payments in ₾
+    </div>
+</footer>
+
+<!-- PRODUCT PICKER MODAL -->
+<div class="modal-backdrop" id="productModal" role="dialog" aria-modal="true" aria-labelledby="productModalTitle">
+    <div class="modal">
+        <div class="modal-head">
+            <div>
+                <div class="modal-eyebrow" id="productModalEyebrow">Slot 01</div>
+                <div class="modal-title" id="productModalTitle">Choose your <em>main pick</em></div>
+            </div>
+            <button class="modal-close" data-close="productModal" aria-label="Close">×</button>
+        </div>
+        <div class="product-grid" id="productGrid"></div>
+    </div>
+</div>
+
+<!-- CHECKOUT MODAL -->
+<div class="modal-backdrop" id="checkoutModal" role="dialog" aria-modal="true" aria-labelledby="checkoutModalTitle">
+    <div class="modal">
+        <div class="modal-head">
+            <div>
+                <div class="modal-eyebrow">Order summary</div>
+                <div class="modal-title" id="checkoutModalTitle">Your <em>Gamif</em> box</div>
+            </div>
+            <button class="modal-close" data-close="checkoutModal" aria-label="Close">×</button>
+        </div>
+        <div class="checkout-body">
+            <div class="checkout-list" id="checkoutList"></div>
+            <div class="checkout-totals">
+                <div class="ck-tot-row"><span>Retail total</span><span id="ckRetail">0 ₾</span></div>
+                <div class="ck-tot-row"><span>Box discount</span><span id="ckDiscount">−0 ₾</span></div>
+                <div class="ck-tot-row bonus" id="ckBonusRow" style="display:none;"><span id="ckBonusLabel">Wheel bonus</span><span id="ckBonusValue"></span></div>
+                <div class="ck-tot-row final"><span>You pay</span><span id="ckFinal">0 ₾</span></div>
+            </div>
+            <button class="checkout-cta" id="checkoutPay">Pay with Stripe · ₾</button>
+            <p class="checkout-note">Demo · in production this opens a Stripe Payment Intent in GEL.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+// MOCK CATALOGUE — replace with /api/products in React
+const PRODUCTS = {
+    main: [
+        { id: 'm1', name: 'Vetro Candle',     retail: 38,  icon: '🕯️', tier: 'sorpresa' },
+        { id: 'm2', name: 'Linen Scarf',      retail: 45,  icon: '🧣', tier: 'sorpresa' },
+        { id: 'm3', name: 'Saffron Honey',    retail: 32,  icon: '🍯', tier: 'sorpresa' },
+        { id: 'm4', name: 'Ceramic Mug Pair', retail: 62,  icon: '🍵', tier: 'premiata' },
+        { id: 'm5', name: 'Leather Journal',  retail: 78,  icon: '📓', tier: 'premiata' },
+        { id: 'm6', name: 'Brass Carafe',     retail: 145, icon: '🫗', tier: 'leggenda' },
+    ],
+    sweet: [
+        { id: 's1', name: 'Chocolate Bar Set',     retail: 18, icon: '🍫', tier: 'sorpresa' },
+        { id: 's2', name: 'Caramel Tin',           retail: 14, icon: '🍮', tier: 'sorpresa' },
+        { id: 's3', name: 'Fig & Walnut Jam',      retail: 16, icon: '🫙', tier: 'sorpresa' },
+        { id: 's4', name: 'Single Origin Tea',     retail: 28, icon: '🫖', tier: 'premiata' },
+        { id: 's5', name: 'Truffle Box',           retail: 42, icon: '🍬', tier: 'premiata' },
+        { id: 's6', name: 'Vintage Wine Mignon',   retail: 68, icon: '🍷', tier: 'leggenda' },
+    ],
+    bonus: [
+        { id: 'b1', name: 'Origami Token',      retail: 6,  icon: '🎴', tier: 'sorpresa' },
+        { id: 'b2', name: 'Wax Seal Stamp',     retail: 9,  icon: '🔖', tier: 'sorpresa' },
+        { id: 'b3', name: 'Mini Notebook',      retail: 7,  icon: '📔', tier: 'sorpresa' },
+        { id: 'b4', name: 'Pressed Flower Card', retail: 12, icon: '🌸', tier: 'premiata' },
+        { id: 'b5', name: 'Brass Lapel Pin',    retail: 18, icon: '📍', tier: 'premiata' },
+        { id: 'b6', name: 'Polished River Stone', retail: 24, icon: '💎', tier: 'leggenda' },
+    ],
+};
+const TIERS = {
+    sorpresa: { name: 'Sorpresa',  basePrice: 49,  retailRange: [70, 95] },
+    premiata: { name: 'Premiata',  basePrice: 99,  retailRange: [140, 180] },
+    leggenda: { name: 'Leggenda',  basePrice: 199, retailRange: [280, 340] },
+};
+const SPIN_OUTCOMES = [
+    { key: 'free_delivery',  icon: '🚚', label: 'Free delivery unlocked',         note: 'We cover the courier on this one.' },
+    { key: 'extra_discount', icon: '✦',  label: '+10% extra discount applied',   note: 'On top of your box price.' },
+    { key: 'bonus_item',     icon: '🎁', label: 'Mystery bonus item added',       note: 'A curator pick — revealed at unboxing.' },
+    { key: 'upgrade',        icon: '⬆',  label: 'Premium upgrade granted',        note: 'Your main pick bumps up a tier.' },
+    { key: 'curator_pick',   icon: '♢',  label: "Curator's pick added",           note: 'Hand-selected by our atelier.' },
+    { key: 'next_order',     icon: '↻',  label: 'Free spin saved for next order', note: 'Stay tuned — your next box has it.' },
+];
+
+const state = { slots: { main: null, sweet: null, bonus: null }, tier: null, spin: null };
+const DISCOUNT_RATE = 0.35;
+const BONUS_DISCOUNT_RATE = 0.10;
+
+// Pick up ?tier=... from URL
+const urlTier = new URLSearchParams(location.search).get('tier');
+if (urlTier && TIERS[urlTier]) {
+    state.tier = urlTier;
+    document.getElementById('tierPillText').textContent = `Building: ${TIERS[urlTier].name}`;
+    document.getElementById('tierPill').classList.add('visible');
+}
+
+// CURSOR
+const dot = document.getElementById('cursorDot');
+const ring = document.getElementById('cursorRing');
+let rx = 0, ry = 0, dx = 0, dy = 0;
+document.addEventListener('mousemove', e => { dx = e.clientX; dy = e.clientY; dot.style.left = dx + 'px'; dot.style.top = dy + 'px'; });
+(function animRing() {
+    rx += (dx - rx) * 0.14; ry += (dy - ry) * 0.14;
+    ring.style.left = rx + 'px'; ring.style.top = ry + 'px';
+    requestAnimationFrame(animRing);
+})();
+function bindHover(scope = document) {
+    scope.querySelectorAll('a, button, .product-card, .wheel-preview').forEach(el => {
+        if (el.__cursorBound) return;
+        el.__cursorBound = true;
+        el.addEventListener('mouseenter', () => {
+            dot.style.width  = '12px'; dot.style.height = '12px';
+            ring.style.width = '52px'; ring.style.height = '52px';
+            ring.style.opacity = '.25';
+        });
+        el.addEventListener('mouseleave', () => {
+            dot.style.width  = '6px'; dot.style.height = '6px';
+            ring.style.width = '34px'; ring.style.height = '34px';
+            ring.style.opacity = '.55';
+        });
+    });
+}
+bindHover();
+
+// TIER PILL CLEAR
+document.getElementById('tierPillClear').addEventListener('click', () => {
+    state.tier = null;
+    document.getElementById('tierPill').classList.remove('visible');
+    recalcTotals();
+});
+
+// MODALS
+function openModal(id) { document.getElementById(id).classList.add('open'); document.body.classList.add('modal-open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); document.body.classList.remove('modal-open'); }
+document.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', () => closeModal(btn.dataset.close)));
+document.querySelectorAll('.modal-backdrop').forEach(bd => bd.addEventListener('click', e => { if (e.target === bd) closeModal(bd.id); }));
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') document.querySelectorAll('.modal-backdrop.open').forEach(bd => closeModal(bd.id));
+});
+
+// PRODUCT PICKER
+const productGrid = document.getElementById('productGrid');
+const productModalEyebrow = document.getElementById('productModalEyebrow');
+const productModalTitle = document.getElementById('productModalTitle');
+const slotLabels = {
+    main:  { eyebrow: 'Slot 01', title: 'Choose your <em>main pick</em>' },
+    sweet: { eyebrow: 'Slot 02', title: 'Choose your <em>sweet pick</em>' },
+    bonus: { eyebrow: 'Slot 03', title: 'Choose your <em>bonus token</em>' },
+};
+function fetchProducts(slot) {
+    return new Promise(resolve => {
+        setTimeout(() => {
+            let items = PRODUCTS[slot] || [];
+            if (state.tier) {
+                const allowed = state.tier === 'sorpresa' ? ['sorpresa']
+                              : state.tier === 'premiata' ? ['sorpresa', 'premiata']
+                              : ['sorpresa', 'premiata', 'leggenda'];
+                items = items.filter(p => allowed.includes(p.tier));
+            }
+            resolve(items);
+        }, 280);
+    });
+}
+let currentPickSlot = null;
+function showSkeletons() {
+    productGrid.innerHTML = '';
+    for (let i = 0; i < 6; i++) {
+        const card = document.createElement('div');
+        card.className = 'product-card';
+        card.innerHTML = `
+            <div class="slot-orb loading" style="width:56px;height:56px;margin-bottom:14px;"></div>
+            <div class="slot-orb loading" style="width:80px;height:14px;border-radius:2px;margin-bottom:8px;"></div>
+            <div class="slot-orb loading" style="width:60px;height:10px;border-radius:2px;"></div>`;
+        productGrid.appendChild(card);
+    }
+}
+function renderProducts(items) {
+    productGrid.innerHTML = '';
+    if (!items.length) {
+        productGrid.innerHTML = `<p style="grid-column:1/-1;text-align:center;color:var(--muted);padding:40px 0;">No products available in this tier.</p>`;
+        return;
+    }
+    items.forEach(p => {
+        const selected = state.slots[currentPickSlot]?.id === p.id;
+        const card = document.createElement('button');
+        card.className = 'product-card' + (selected ? ' selected' : '');
+        card.innerHTML = `
+            <div class="product-icon">${p.icon}</div>
+            <div class="product-name">${p.name}</div>
+            <div class="product-price">${p.retail} ₾ retail</div>`;
+        card.addEventListener('click', () => {
+            state.slots[currentPickSlot] = p;
+            renderSlot(currentPickSlot);
+            recalcTotals();
+            closeModal('productModal');
+        });
+        productGrid.appendChild(card);
+    });
+    bindHover(productGrid);
+}
+document.querySelectorAll('[data-pick]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        currentPickSlot = btn.dataset.pick;
+        const labels = slotLabels[currentPickSlot];
+        productModalEyebrow.textContent = labels.eyebrow;
+        productModalTitle.innerHTML = labels.title;
+        showSkeletons();
+        openModal('productModal');
+        try {
+            const items = await fetchProducts(currentPickSlot);
+            renderProducts(items);
+        } catch (err) {
+            productGrid.innerHTML = `<p style="grid-column:1/-1;text-align:center;color:var(--burg-mid);padding:40px 0;">Couldn't load products. Please try again.</p>`;
+        }
+    });
+});
+
+// RENDER SLOT + RECALC
+function renderSlot(key) {
+    const slot = document.querySelector(`.slot[data-slot="${key}"]`);
+    const item = state.slots[key];
+    const orbEl = document.getElementById(`orb-${key}`);
+    const infoEl = document.getElementById(`info-${key}`);
+    const btn = slot.querySelector('.slot-btn');
+    if (item) {
+        slot.classList.add('filled');
+        orbEl.textContent = item.icon;
+        infoEl.querySelector('.slot-item-name').textContent = item.name;
+        infoEl.querySelector('.slot-item-price').textContent = `${item.retail} ₾ retail`;
+        btn.textContent = '↻ Change';
+        btn.classList.add('change');
+    } else {
+        slot.classList.remove('filled');
+        btn.textContent = '＋ Choose item';
+        btn.classList.remove('change');
+    }
+}
+function recalcTotals() {
+    const items = Object.values(state.slots).filter(Boolean);
+    const retailEl = document.getElementById('retailTotal');
+    const boxEl = document.getElementById('boxTotal');
+    const savingsEl = document.getElementById('savingsBadge');
+    const spinCta = document.getElementById('spinBuildCta');
+    if (items.length === 0) {
+        retailEl.textContent = '— ₾'; retailEl.classList.remove('has-value');
+        boxEl.textContent = '— ₾';
+        savingsEl.textContent = 'Select items above to see your savings';
+        savingsEl.classList.remove('badge');
+        spinCta.disabled = true;
+        return;
+    }
+    const retail = items.reduce((s, p) => s + p.retail, 0);
+    let box = Math.round(retail * (1 - DISCOUNT_RATE));
+    if (state.tier) box = Math.max(box, TIERS[state.tier].basePrice);
+    const savingsPct = Math.round((1 - box / retail) * 100);
+    retailEl.textContent = `${retail} ₾`;
+    retailEl.classList.toggle('has-value', items.length === 3);
+    boxEl.textContent = `${box} ₾`;
+    if (items.length === 3) {
+        savingsEl.textContent = `You save ${savingsPct}%`;
+        savingsEl.classList.add('badge');
+        spinCta.disabled = false;
+    } else {
+        savingsEl.textContent = `Add ${3 - items.length} more pick${3 - items.length > 1 ? 's' : ''} to unlock the spin`;
+        savingsEl.classList.remove('badge');
+        spinCta.disabled = true;
+    }
+}
+recalcTotals();
+
+// SPIN + CHECKOUT
+const wheelRing = document.getElementById('wheelRing');
+const spinResult = document.getElementById('spinResult');
+const spinIcon = document.getElementById('spinIcon');
+const spinText = document.getElementById('spinText');
+const spinNote = document.getElementById('spinNote');
+const wheelPreview = document.getElementById('wheelPreview');
+function mockSpin() {
+    return new Promise(resolve => {
+        setTimeout(() => resolve(SPIN_OUTCOMES[Math.floor(Math.random() * SPIN_OUTCOMES.length)]), 2500);
+    });
+}
+function showSpinResult(outcome) {
+    state.spin = outcome;
+    spinIcon.textContent = outcome.icon;
+    spinText.textContent = outcome.label;
+    spinNote.textContent = outcome.note;
+    spinResult.classList.add('shown');
+}
+async function runSpin() {
+    if (Object.values(state.slots).filter(Boolean).length < 3) return;
+    wheelRing.classList.remove('spinning');
+    void wheelRing.offsetWidth;
+    wheelRing.classList.add('spinning');
+    spinResult.classList.remove('shown');
+    state.spin = null;
+    const outcome = await mockSpin();
+    showSpinResult(outcome);
+}
+wheelPreview.addEventListener('click', runSpin);
+document.getElementById('spinBuildCta').addEventListener('click', async () => {
+    if (Object.values(state.slots).filter(Boolean).length < 3) return;
+    if (!state.spin) await runSpin();
+    openCheckout();
+});
+function openCheckout() {
+    const items = Object.entries(state.slots).map(([slot, p]) => ({ slot, ...p }));
+    const list = document.getElementById('checkoutList');
+    list.innerHTML = '';
+    items.forEach(it => {
+        const row = document.createElement('div');
+        row.className = 'checkout-row';
+        row.innerHTML = `
+            <div>
+                <div class="ck-name">${it.icon} &nbsp; ${it.name}</div>
+                <div class="ck-meta">${it.slot === 'main' ? 'Main pick' : it.slot === 'sweet' ? 'Sweet pick' : 'Bonus token'}</div>
+            </div>
+            <div class="ck-price">${it.retail} ₾</div>`;
+        list.appendChild(row);
+    });
+    const retail = items.reduce((s, p) => s + p.retail, 0);
+    let box = Math.round(retail * (1 - DISCOUNT_RATE));
+    if (state.tier) box = Math.max(box, TIERS[state.tier].basePrice);
+    let final = box;
+    document.getElementById('ckRetail').textContent = `${retail} ₾`;
+    document.getElementById('ckDiscount').textContent = `−${retail - box} ₾`;
+    const bonusRow = document.getElementById('ckBonusRow');
+    bonusRow.style.display = 'none';
+    if (state.spin) {
+        bonusRow.style.display = 'flex';
+        document.getElementById('ckBonusLabel').textContent = `✦ ${state.spin.label}`;
+        const value = document.getElementById('ckBonusValue');
+        if (state.spin.key === 'extra_discount') {
+            const extra = Math.round(box * BONUS_DISCOUNT_RATE);
+            final = box - extra;
+            value.textContent = `−${extra} ₾`;
+        } else if (state.spin.key === 'free_delivery') value.textContent = 'Included';
+        else value.textContent = 'Added to box';
+    }
+    document.getElementById('ckFinal').textContent = `${final} ₾`;
+    openModal('checkoutModal');
+}
+document.getElementById('checkoutPay').addEventListener('click', () => {
+    alert('Stripe payment in ₾ would launch here.');
+});
+</script>
+</body>
+</html>

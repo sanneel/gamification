@@ -3,33 +3,37 @@
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, CreditCard, Gift, Lock, Sparkles, Zap } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CreditCard, Lock } from "lucide-react";
 import { useState } from "react";
+import clsx from "clsx";
+
+import Navbar from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
+import { Reveal } from "@/components/primitives/Reveal";
+import { SplitHeading } from "@/components/primitives/SplitHeading";
 import { useCartStore } from "@/lib/stores/cart";
 import { formatGELSimple } from "@/lib/types";
-import { springs, ease } from "@/lib/motion";
-import Navbar from "@/components/Navbar";
 
+const ease = [0.16, 1, 0.3, 1] as const;
 type Step = "details" | "payment" | "success";
+type FormKey = "name" | "email" | "phone" | "city" | "address" | "note" | "promoCode";
 
 export default function CheckoutPage() {
   const { items, subtotal, clearCart } = useCartStore();
-  const [step, setStep] = useState<Step>("details");
+  const [step, setStep]       = useState<Step>("details");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({
+  const [error, setError]     = useState<string | null>(null);
+  const [form, setForm]       = useState<Record<FormKey, string>>({
     name: "", email: "", phone: "", city: "", address: "", note: "", promoCode: "",
   });
 
-  const sub = subtotal();
+  const sub      = subtotal();
   const shipping = sub > 0 ? 500 : 0;
-  const total = sub + shipping;
+  const total    = sub + shipping;
 
-  function update(key: keyof typeof form, val: string) {
-    setForm((f) => ({ ...f, [key]: val }));
-  }
+  const update = (key: FormKey, val: string) => setForm((f) => ({ ...f, [key]: val }));
 
-  const isDetailsValid = form.name.trim().length >= 2 && form.email.includes("@") && form.city.trim().length >= 2;
+  const detailsValid = form.name.trim().length >= 2 && form.email.includes("@") && form.city.trim().length >= 2;
 
   async function handlePlaceOrder() {
     setLoading(true);
@@ -50,14 +54,9 @@ export default function CheckoutPage() {
         }),
       });
       const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else if (data.success || res.ok) {
-        clearCart();
-        setStep("success");
-      } else {
-        setError(data.error ?? "Checkout failed. Please try again.");
-      }
+      if (data.url) window.location.href = data.url;
+      else if (data.success || res.ok) { clearCart(); setStep("success"); }
+      else setError(data.error ?? "Checkout failed. Please try again.");
     } catch {
       clearCart();
       setStep("success");
@@ -66,120 +65,153 @@ export default function CheckoutPage() {
     }
   }
 
-  if (step === "success") return <SuccessScreen name={form.name} />;
+  if (step === "success") return <Success name={form.name} />;
 
   return (
-    <div className="min-h-screen bg-[#0D0D0D]">
+    <main className="surface-bone min-h-dvh">
       <Navbar />
 
-      <div className="max-w-5xl mx-auto px-4 py-10">
-        {/* Step indicator */}
-        <div className="flex items-center gap-3 mb-10">
-          {(["details", "payment"] as const).map((s, i) => (
-            <div key={s} className="flex items-center gap-3">
-              <motion.div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black transition-all ${
-                  step === s
-                    ? "bg-accent text-white shadow-glow-accent"
-                    : step === "payment" && s === "details"
-                    ? "bg-emerald text-white"
-                    : "bg-white/8 text-white/30"
-                }`}
-                animate={step === s ? { scale: [1, 1.08, 1] } : {}}
-                transition={{ duration: 0.5 }}
-              >
-                {step === "payment" && s === "details" ? <Check className="w-3.5 h-3.5" /> : i + 1}
-              </motion.div>
-              <span className={`text-sm font-bold capitalize ${step === s ? "text-white" : "text-white/30"}`}>
-                {s}
-              </span>
-              {i === 0 && <div className="w-12 h-px bg-white/8" />}
-            </div>
-          ))}
+      <section className="container-edge container-wide pt-40 pb-12">
+        <div className="grid grid-cols-1 gap-12 md:grid-cols-12 md:items-end">
+          <div className="md:col-span-8">
+            <Reveal>
+              <p className="eyebrow text-[var(--storm-55)]">Step into the final act</p>
+            </Reveal>
+            <SplitHeading
+              as="h1"
+              className="font-display mt-6 text-display-xl leading-[0.9] text-[var(--ink)]"
+            >
+              Checkout.
+            </SplitHeading>
+          </div>
+          <Reveal delay={0.18} className="md:col-span-4">
+            <ProgressIndicator step={step} />
+          </Reveal>
         </div>
+      </section>
 
-        <div className="grid lg:grid-cols-3 gap-10">
-          <div className="lg:col-span-2">
+      <section className="container-edge container-wide pb-32">
+        <div className="grid grid-cols-1 gap-16 md:grid-cols-12">
+          <div className="md:col-span-7">
             <AnimatePresence mode="wait">
               {step === "details" && (
-                <DetailsForm key="details" form={form} update={update} onNext={() => setStep("payment")} isValid={isDetailsValid} />
+                <Details
+                  key="details"
+                  form={form}
+                  update={update}
+                  isValid={detailsValid}
+                  onNext={() => setStep("payment")}
+                />
               )}
               {step === "payment" && (
-                <PaymentStep key="payment" form={form} update={update} onBack={() => setStep("details")} onPlace={handlePlaceOrder} loading={loading} error={error} total={total} />
+                <Payment
+                  key="payment"
+                  form={form}
+                  update={update}
+                  onBack={() => setStep("details")}
+                  onPlace={handlePlaceOrder}
+                  loading={loading}
+                  error={error}
+                  total={total}
+                />
               )}
             </AnimatePresence>
           </div>
 
-          <div>
-            <OrderSummary items={items} sub={sub} shipping={shipping} total={total} />
+          <div className="md:col-span-5">
+            <Summary items={items} sub={sub} shipping={shipping} total={total} />
           </div>
         </div>
-      </div>
+      </section>
+
+      <Footer />
+    </main>
+  );
+}
+
+function ProgressIndicator({ step }: { step: Step }) {
+  const steps = [
+    { key: "details", label: "Delivery" },
+    { key: "payment", label: "Payment" },
+    { key: "success", label: "Sealed" },
+  ] as const;
+  const idx = steps.findIndex((s) => s.key === step);
+  return (
+    <div className="flex items-center gap-3">
+      {steps.map((s, i) => (
+        <div key={s.key} className="flex items-center gap-3">
+          <span className={clsx(
+            "flex h-7 w-7 items-center justify-center border text-[11px] tabular",
+            i < idx ? "bg-[var(--ink)] text-[var(--bone)] border-[var(--ink)]"
+            : i === idx ? "border-[var(--ink)] text-[var(--ink)]"
+            : "border-[var(--hair-warm)] text-[var(--storm-35)]",
+          )}>
+            {i < idx ? <Check className="h-3 w-3" /> : String(i+1).padStart(2,"0")}
+          </span>
+          <span className={clsx("eyebrow", i === idx ? "text-[var(--ink)]" : "text-[var(--storm-55)]")}>
+            {s.label}
+          </span>
+          {i < steps.length - 1 && <span className="block h-px w-6 bg-[var(--hair-warm)]" />}
+        </div>
+      ))}
     </div>
   );
 }
 
-type FormKey = "name" | "email" | "phone" | "city" | "address" | "note" | "promoCode";
-
-function DetailsForm({ form, update, onNext, isValid }: {
+function Details({ form, update, isValid, onNext }: {
   form: Record<FormKey, string>;
   update: (k: FormKey, v: string) => void;
-  onNext: () => void;
   isValid: boolean;
+  onNext: () => void;
 }) {
   return (
     <motion.div
-      className="space-y-6"
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      transition={{ duration: 0.35, ease: ease.expo }}
+      transition={{ duration: 0.55, ease }}
+      className="space-y-12"
     >
       <div>
-        <h2 className="font-display text-2xl font-bold text-white mb-1">Delivery Details</h2>
-        <p className="text-white/35 text-sm">Where should we send the magic?</p>
+        <p className="eyebrow text-[var(--storm-55)]">Act I · Delivery</p>
+        <p className="font-display mt-4 text-display-sm text-[var(--ink)]">Where shall we send the box?</p>
       </div>
 
-      <div className="grid sm:grid-cols-2 gap-4">
-        <Field label="Full Name" value={form.name} onChange={(v) => update("name", v)} placeholder="Nino Beridze" required />
-        <Field label="Email" type="email" value={form.email} onChange={(v) => update("email", v)} placeholder="nino@example.com" required />
-        <Field label="Phone" type="tel" value={form.phone} onChange={(v) => update("phone", v)} placeholder="+995 5xx xxx xxx" />
-        <Field label="City" value={form.city} onChange={(v) => update("city", v)} placeholder="Tbilisi" required />
+      <div className="grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2">
+        <Field label="Full name" value={form.name} onChange={(v) => update("name", v)} placeholder="Nino Beridze" required />
+        <Field label="Email"     value={form.email} onChange={(v) => update("email", v)} placeholder="nino@example.com" type="email" required />
+        <Field label="Phone"     value={form.phone} onChange={(v) => update("phone", v)} placeholder="+995 5xx xxx xxx" type="tel" />
+        <Field label="City"      value={form.city} onChange={(v) => update("city", v)} placeholder="Tbilisi" required />
+        <Field className="sm:col-span-2" label="Address" value={form.address} onChange={(v) => update("address", v)} placeholder="Street, apartment, postcode" />
         <div className="sm:col-span-2">
-          <Field label="Address" value={form.address} onChange={(v) => update("address", v)} placeholder="Street, apartment..." />
-        </div>
-        <div className="sm:col-span-2">
-          <label className="text-white/30 text-xs font-black uppercase tracking-widest mb-2 block">Gift Note</label>
+          <label className="eyebrow mb-3 block text-[var(--storm-55)]">A note to the courier</label>
           <textarea
             value={form.note}
             onChange={(e) => update("note", e.target.value)}
-            placeholder="Include a special message with the delivery..."
-            rows={3}
-            className="w-full rounded-2xl px-4 py-3.5 text-sm outline-none resize-none transition-all text-white placeholder-white/25"
-            style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
-            onFocus={(e) => { e.target.style.borderColor = "rgba(255,45,120,0.5)"; e.target.style.boxShadow = "0 0 0 2px rgba(255,45,120,0.12)"; }}
-            onBlur={(e) => { e.target.style.borderColor = "rgba(255,255,255,0.1)"; e.target.style.boxShadow = "none"; }}
+            placeholder="Any special instructions for the delivery…"
+            rows={4}
+            className="canvas-input w-full resize-none text-base"
           />
         </div>
       </div>
 
-      <motion.button
+      <button
         onClick={onNext}
         disabled={!isValid}
-        className={`w-full py-4 rounded-2xl text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 ${
-          isValid ? "btn-dopamine" : "text-white/25 cursor-not-allowed"
-        }`}
-        style={!isValid ? { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" } : {}}
-        whileHover={isValid ? { scale: 1.02 } : {}}
-        whileTap={isValid ? { scale: 0.97 } : {}}
+        className={clsx(
+          "btn-cinematic w-full justify-center",
+          isValid ? "btn-cinematic--primary" : "border border-[var(--hair-warm)] text-[var(--storm-35)] cursor-not-allowed",
+        )}
       >
-        Continue to Payment <span className="ml-1">→</span>
-      </motion.button>
+        <span className="btn-cinematic__label flex items-center gap-3">
+          Continue to payment <ArrowRight className="h-3 w-3" />
+        </span>
+      </button>
     </motion.div>
   );
 }
 
-function PaymentStep({ form, update, onBack, onPlace, loading, error, total }: {
+function Payment({ form, update, onBack, onPlace, loading, error, total }: {
   form: Record<FormKey, string>;
   update: (k: FormKey, v: string) => void;
   onBack: () => void;
@@ -190,54 +222,43 @@ function PaymentStep({ form, update, onBack, onPlace, loading, error, total }: {
 }) {
   return (
     <motion.div
-      className="space-y-6"
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
-      transition={{ duration: 0.35, ease: ease.expo }}
+      transition={{ duration: 0.55, ease }}
+      className="space-y-12"
     >
       <div>
-        <h2 className="font-display text-2xl font-bold text-white mb-1">Payment</h2>
-        <p className="text-white/35 text-sm">You&apos;ll be redirected to Stripe&apos;s secure page.</p>
+        <p className="eyebrow text-[var(--storm-55)]">Act II · Payment</p>
+        <p className="font-display mt-4 text-display-sm text-[var(--ink)]">A short visit to Stripe.</p>
+        <p className="mt-3 max-w-md text-body text-[var(--storm-55)]">
+          Card details never touch our servers — Stripe handles the entire exchange.
+        </p>
       </div>
 
-      {/* Promo code */}
       <div>
-        <label className="text-white/30 text-xs font-black uppercase tracking-widest mb-2 block">Promo Code</label>
+        <label className="eyebrow mb-3 block text-[var(--storm-55)]">Promo code</label>
         <div className="flex gap-3">
           <input
-            type="text"
             value={form.promoCode}
             onChange={(e) => update("promoCode", e.target.value.toUpperCase())}
-            placeholder="WELCOME15"
-            className="flex-1 rounded-2xl px-4 py-3.5 text-sm outline-none transition-all text-white placeholder-white/25 font-mono"
-            style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
-            onFocus={(e) => { e.target.style.borderColor = "rgba(255,45,120,0.5)"; }}
-            onBlur={(e) => { e.target.style.borderColor = "rgba(255,255,255,0.1)"; }}
+            placeholder="ATELIER15"
+            className="canvas-input flex-1 tabular tracking-[0.18em]"
           />
-          <button className="px-5 py-3.5 rounded-2xl text-accent text-sm font-bold hover:text-white transition-all"
-            style={{ border: "1px solid rgba(255,45,120,0.3)" }}>
-            Apply
+          <button className="btn-cinematic btn-cinematic--outline">
+            <span className="btn-cinematic__label">Apply</span>
           </button>
         </div>
       </div>
 
-      {/* Payment info */}
-      <div className="rounded-2xl p-5"
-        style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
-        <div className="flex items-center gap-3 mb-3">
-          <CreditCard className="w-5 h-5 text-accent" />
-          <span className="text-white font-bold">Secure Payment via Stripe</span>
+      <div className="border border-[var(--hair-warm)] p-6">
+        <div className="flex items-center gap-3 text-[var(--ink)]">
+          <CreditCard className="h-4 w-4" />
+          <p className="eyebrow">Stripe · secure exchange</p>
         </div>
-        <p className="text-white/35 text-sm mb-4 leading-relaxed">
-          We never store your card details. All transactions are encrypted.
-        </p>
-        <div className="flex gap-2 flex-wrap">
+        <div className="mt-5 flex flex-wrap gap-2">
           {["Visa", "Mastercard", "Amex", "Apple Pay", "Google Pay"].map((m) => (
-            <span key={m} className="text-[10px] font-bold px-2.5 py-1 rounded-lg text-white/40"
-              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
-              {m}
-            </span>
+            <span key={m} className="box-badge--outline box-badge">{m}</span>
           ))}
         </div>
       </div>
@@ -245,155 +266,150 @@ function PaymentStep({ form, update, onBack, onPlace, loading, error, total }: {
       <AnimatePresence>
         {error && (
           <motion.p
-            className="text-red-400 text-sm font-bold px-4 py-3 rounded-xl"
-            style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
+            className="border border-[var(--accent)] px-5 py-4 text-sm text-[var(--accent)]"
           >
             {error}
           </motion.p>
         )}
       </AnimatePresence>
 
-      <div className="flex gap-3">
-        <button
-          onClick={onBack}
-          className="px-6 py-4 rounded-2xl text-white/50 hover:text-white hover:border-white/25 transition-all text-sm font-bold"
-          style={{ border: "1px solid rgba(255,255,255,0.1)" }}
-        >
-          ←
+      <div className="flex flex-col gap-3 md:flex-row">
+        <button onClick={onBack} className="btn-cinematic btn-cinematic--outline">
+          <span className="btn-cinematic__label flex items-center gap-3">
+            <ArrowLeft className="h-3 w-3" /> Edit delivery
+          </span>
         </button>
-        <motion.button
+        <button
           onClick={onPlace}
           disabled={loading}
-          className="flex-1 btn-dopamine py-4 rounded-2xl text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2"
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.97 }}
+          className="btn-cinematic btn-cinematic--primary flex-1 justify-center"
         >
-          {loading
-            ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            : <><Zap className="w-4 h-4" /> Pay {formatGELSimple(total)}</>}
-        </motion.button>
+          <span className="btn-cinematic__label flex items-center gap-3">
+            {loading ? "Routing to Stripe…" : `Pay ${formatGELSimple(total)}`}
+          </span>
+        </button>
       </div>
 
-      <p className="text-center text-white/20 text-xs flex items-center justify-center gap-1.5">
-        <Lock className="w-3 h-3" /> 256-bit SSL encryption · Powered by Stripe
+      <p className="flex items-center justify-center gap-2 text-[11px] uppercase tracking-[0.28em] text-[var(--storm-55)]">
+        <Lock className="h-3 w-3" /> 256-bit SSL · powered by Stripe
       </p>
     </motion.div>
   );
 }
 
-function OrderSummary({ items, sub, shipping, total }: {
+function Summary({ items, sub, shipping, total }: {
   items: ReturnType<typeof useCartStore.getState>["items"];
   sub: number;
   shipping: number;
   total: number;
 }) {
   return (
-    <div
-      className="rounded-2xl p-5 sticky top-24 space-y-4"
-      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}
-    >
-      <h3 className="font-display text-lg font-bold text-white">Your Order</h3>
+    <div className="sticky top-32 border border-[var(--hair-warm)] p-8 space-y-6">
+      <p className="eyebrow text-[var(--storm-55)]">Your order</p>
 
-      <div className="space-y-3 max-h-60 overflow-y-auto">
+      <div className="max-h-72 space-y-5 overflow-y-auto">
+        {items.length === 0 && (
+          <p className="text-sm text-[var(--storm-55)]">Nothing in the cart yet.</p>
+        )}
         {items.map((item) => (
-          <div key={item.product.id} className="flex items-center gap-3">
-            <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-white/8 shrink-0">
-              <Image src={item.product.images[0]} alt={item.product.title} fill className="object-cover" sizes="48px" />
+          <div key={item.product.id} className="flex items-center gap-4">
+            <div className="relative h-14 w-12 shrink-0 overflow-clip surface-bone-2">
+              <Image src={item.product.images[0]} alt={item.product.title} fill sizes="48px" className="object-cover" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-white text-xs font-bold truncate">{item.product.title}</p>
-              <p className="text-white/30 text-[10px]">×{item.quantity}</p>
+              <p className="font-display text-base text-[var(--ink)] truncate">{item.product.title}</p>
+              <p className="text-xs text-[var(--storm-55)] tabular">×{item.quantity}</p>
             </div>
-            <span className="text-white text-xs font-black shrink-0 tabular-nums">
+            <span className="tabular text-sm text-[var(--ink)]">
               {formatGELSimple(item.product.normalPrice * item.quantity)}
             </span>
           </div>
         ))}
       </div>
 
-      <div className="border-t border-white/8 pt-4 space-y-2">
-        <div className="flex justify-between text-sm text-white/40">
-          <span>Subtotal</span><span className="tabular-nums">{formatGELSimple(sub)}</span>
-        </div>
-        <div className="flex justify-between text-sm text-white/40">
-          <span>Shipping</span><span className="tabular-nums">{formatGELSimple(shipping)}</span>
-        </div>
-        <div className="flex justify-between font-black text-white pt-1">
-          <span>Total</span><span className="tabular-nums">{formatGELSimple(total)}</span>
+      <div className="space-y-3 border-t border-[var(--hair-warm)] pt-5">
+        <Row label="Subtotal" value={formatGELSimple(sub)} />
+        <Row label="Delivery" value={formatGELSimple(shipping)} />
+        <div className="flex items-baseline justify-between border-t border-[var(--hair-warm)] pt-4">
+          <span className="eyebrow text-[var(--ink)]">Total · GEL</span>
+          <span className="font-display text-display-sm tabular text-[var(--ink)]">{formatGELSimple(total)}</span>
         </div>
       </div>
     </div>
   );
 }
 
-function SuccessScreen({ name }: { name: string }) {
+function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-h-screen bg-[#0D0D0D] flex flex-col items-center justify-center px-6 text-center">
-      <motion.div
-        initial={{ scale: 0.7, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={springs.bouncy}
-        className="space-y-6 max-w-sm"
-      >
-        <motion.div
-          className="text-7xl"
-          animate={{ rotate: [0, -5, 5, -3, 0] }}
-          transition={{ delay: 0.3, duration: 0.8 }}
-        >
-          🎉
-        </motion.div>
-        <h1 className="font-display text-4xl font-bold text-white">Order Placed!</h1>
-        <p className="text-white/50 text-base leading-relaxed">
-          Thank you{name ? `, ${name.split(" ")[0]}` : ""}! Your order is confirmed and will be gift-wrapped with love.
-        </p>
-        <div className="rounded-2xl p-4 flex items-center gap-3 text-left"
-          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-          <div className="text-2xl">📦</div>
-          <div>
-            <p className="text-white font-bold text-sm">What happens next?</p>
-            <p className="text-white/40 text-xs">You&apos;ll receive a confirmation email shortly. Delivery within 1–3 days.</p>
-          </div>
-        </div>
-        <div className="flex flex-col gap-3">
-          <Link href="/shop" className="btn-dopamine py-4 rounded-2xl text-sm font-black flex items-center justify-center gap-2">
-            <Sparkles className="w-4 h-4" /> Keep Shopping
-          </Link>
-          <Link href="/build-a-box" className="py-3 rounded-2xl text-white/50 hover:text-white text-sm font-bold flex items-center justify-center gap-2 transition-all"
-            style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
-            <Gift className="w-4 h-4" /> Build Another Box
-          </Link>
-        </div>
-      </motion.div>
+    <div className="flex justify-between text-sm">
+      <span className="text-[var(--storm-55)]">{label}</span>
+      <span className="tabular text-[var(--ink)]">{value}</span>
     </div>
   );
 }
 
-function Field({ label, value, onChange, placeholder, type = "text", required = false }: {
+function Field({
+  label, value, onChange, placeholder, type = "text", required = false, className,
+}: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
   type?: string;
   required?: boolean;
+  className?: string;
 }) {
   return (
-    <div>
-      <label className="text-white/30 text-xs font-black uppercase tracking-widest mb-2 block">
-        {label} {required && <span className="text-accent">*</span>}
+    <div className={className}>
+      <label className="eyebrow mb-3 block text-[var(--storm-55)]">
+        {label} {required && <span className="text-[var(--accent)]">·</span>}
       </label>
       <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-2xl px-4 py-3.5 text-sm outline-none transition-all text-white placeholder-white/25"
-        style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
-        onFocus={(e) => { e.target.style.borderColor = "rgba(255,45,120,0.5)"; e.target.style.boxShadow = "0 0 0 2px rgba(255,45,120,0.12)"; }}
-        onBlur={(e) => { e.target.style.borderColor = "rgba(255,255,255,0.1)"; e.target.style.boxShadow = "none"; }}
+        className="canvas-input w-full text-base"
       />
     </div>
+  );
+}
+
+function Success({ name }: { name: string }) {
+  return (
+    <main className="surface-bone min-h-dvh">
+      <Navbar />
+      <section className="container-edge container-wide pt-44 pb-32">
+        <motion.div
+          initial={{ opacity: 0, y: 40, filter: "blur(12px)" }}
+          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          transition={{ duration: 1.1, ease }}
+          className="max-w-xl"
+        >
+          <p className="eyebrow text-[var(--accent)]">Sealed · printed · dispatched</p>
+          <SplitHeading
+            as="h1"
+            className="font-display mt-6 text-display-xl leading-[0.9] text-[var(--ink)]"
+          >
+            The box is on its way{name ? `, ${name.split(" ")[0]}` : ""}.
+          </SplitHeading>
+          <p className="mt-8 text-body-lg text-[var(--storm-55)]">
+            A confirmation email is on its way. We will hand-wrap your selection within 48 hours; the courier handles the rest. The recipient will find your letter inside, printed on archival paper.
+          </p>
+          <div className="mt-12 flex flex-wrap gap-4">
+            <Link href="/shop" className="btn-cinematic btn-cinematic--primary">
+              <span className="btn-cinematic__label">Browse another chapter</span>
+            </Link>
+            <Link href="/build-a-box" className="btn-cinematic btn-cinematic--outline">
+              <span className="btn-cinematic__label">Compose another box</span>
+            </Link>
+          </div>
+        </motion.div>
+      </section>
+      <Footer />
+    </main>
   );
 }

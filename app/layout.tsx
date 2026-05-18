@@ -1,26 +1,31 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Providers from "@/components/Providers";
 
 export const metadata: Metadata = {
-  title: "Gamif — Premium Mystery Gift Boxes",
+  title: "Gamif — A cinematic mystery gifting house",
   description:
-    "Build curated mystery gift boxes with exclusive box prices, surprise rewards, and a lucky spin wheel. The most addictive gifting experience in Georgia.",
+    "Curated mystery boxes built piece by piece. Exclusive box prices, a lucky spin, and an unboxing moment built to be remembered.",
   openGraph: {
-    title: "Gamif — Premium Mystery Gift Boxes",
-    description: "Exclusive box prices. Lucky spin rewards. Unforgettable unboxing.",
+    title: "Gamif — A cinematic mystery gifting house",
+    description:
+      "Curated mystery boxes built piece by piece. Exclusive box prices, a lucky spin, and an unboxing moment built to be remembered.",
     type: "website",
+    locale: "en_GE",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#F2EFE9",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <meta name="theme-color" content="#0D0D0D" />
-      </head>
-      <body className="bg-[#0D0D0D] text-white antialiased">
+    <html lang="en">
+      <body className="surface-bone antialiased">
         <Providers>{children}</Providers>
       </body>
     </html>

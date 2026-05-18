@@ -6,6 +6,7 @@ import { LenisProvider } from "@/lib/animation/lenis-provider";
 import { PageTransition } from "@/lib/animation/page-transition";
 import { GrainOverlay } from "@/components/primitives/GrainOverlay";
 import { ScrollProgress } from "@/components/primitives/ScrollProgress";
+import { Preloader } from "@/components/Preloader";
 import { useEffect, useState } from "react";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
@@ -14,6 +15,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <LenisProvider>
+      {mounted && <Preloader />}
       <PageTransition>{children}</PageTransition>
       <MiniCart />
       <RewardPopup />

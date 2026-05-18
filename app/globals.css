@@ -79,6 +79,24 @@ html.lenis, html.lenis body { height: auto; }
 .lenis.lenis-stopped { overflow: clip; }
 .lenis.lenis-scrolling iframe { pointer-events: none; }
 
+/* Vertical writing helper for cinematic side rails */
+.writing-vertical {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+}
+
+/* Cinematic text — SplitType masking helpers */
+.cinematic-line { display: block; overflow: hidden; padding-bottom: 0.08em; }
+.cinematic-word { display: inline-block; will-change: transform; }
+.cinematic-char { display: inline-block; will-change: transform; }
+.manifesto-char { display: inline-block; will-change: transform, opacity, color; transition: none; }
+.rev-line       { display: block; overflow: hidden; padding-bottom: 0.04em; }
+.rev-word       { display: inline-block; will-change: transform, opacity; }
+.split-line     { display: block; overflow: hidden; padding-bottom: 0.04em; }
+.split-word     { display: inline-block; will-change: transform; }
+.split-char     { display: inline-block; will-change: transform; }
+
 /* ── Display type ──────────────────────────────────────────────────────────── */
 h1, h2, h3, h4, .font-display {
   font-family: var(--font-display);
@@ -315,10 +333,16 @@ h3 { line-height: 1.04; }
   100% { background-position: -200% center; }
 }
 
-/* ── SplitType utilities ──────────────────────────────────────────────────── */
+/* ── SplitType parent helpers retained for older sections ────────────────── */
 .split-parent .split-line { overflow: hidden; display: block; }
 .split-parent .split-word { display: inline-block; }
 .split-parent .split-char { display: inline-block; }
+
+/* Scene-friendly section helpers ── overflow-clip avoids GSAP pin spilling */
+[data-scene] { isolation: isolate; }
+[data-scene="hero"]   { contain: paint; }
+[data-scene="acts"]   { contain: paint; }
+[data-scene="final"]  { contain: paint; }
 
 /* ── Custom cursor ────────────────────────────────────────────────────────── */
 .custom-cursor-dot,
